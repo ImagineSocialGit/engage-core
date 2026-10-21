@@ -22,6 +22,18 @@ final class UnavailableFormSubmissionAutomationWorkspace implements FormSubmissi
             'automations' => [],
         ];
     }
+    public function setQuickActionEnabledForForm(
+        string $formKey,
+        bool $contactAvailable,
+        int $automationId,
+        bool $enabled,
+        ?HostedFormContextReference $context = null,
+    ): void {
+        throw ValidationException::withMessages([
+            'quick_action' => 'Automation is not available for this client.',
+        ]);
+    }
+
     public function createQuickActionForForm(
         string $formKey,
         string $formName,

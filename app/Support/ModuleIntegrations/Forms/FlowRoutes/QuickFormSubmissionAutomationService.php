@@ -183,9 +183,136 @@ final class QuickFormSubmissionAutomationService
             ]);
 
             $this->points->create($route, (int) $capability->getKey(), $values);
+
+            // Normal point authoring marks its parent Route as CRM-authored.
+            // Restore the guided source only after this initial point is created.
+            // Subsequent edits through Advanced still switch the source to CRM,
+            // preventing the simplified controls from managing changed Routes.
+            $route->refresh();
+            $route->forceFill([
+                'meta' => array_replace_recursive($route->meta ?? [], [
+                    'authoring' => ['source' => self::SURFACE],
+                ]),
+            ])->save();
+
             $this->activation->enable($route);
 
             return (int) $route->getKey();
+        });
+    }
+
+    /**
+     * Only routes created by this guided surface and still bound to the EXACT
+     * Form + Event context can be managed outside Advanced automation.
+     * A route edited to add branching, change its trigger, or broaden its
+     * entry criteria immediately loses inline-management eligibility.
+     */
+    public function manageable(
+        FlowRoute $route,
+        string $formKey,
+        ?HostedFormContextReference $context,
+    ): bool {
+        if ($context === null
+            || trim($formKey) === ''
+            || ! $route->is_current_version
+            || $route->isArchivedFromAuthoring()
+            || $route->authoringKind() !== FlowRoute::AUTHORING_KIND_AUTOMATIC_BEHAVIOR
+            || data_get($route->meta, 'authoring.source') !== self::SURFACE
+            || data_get($route->meta, 'authoring.trigger_authoring_key') !== FormSubmissionAutomationTriggerAuthoringContributor::KEY
+            || $route->trigger_type !== FlowRoute::TRIGGER_AUTOMATION_EVENT
+            || $route->trigger_key !== FormSubmissionAutomationTriggerAuthoringContributor::EVENT_KEY
+            || $route->activeFlowRoutePoints()->count() !== 1
+        ) {
+            return false;
+        }
+
+        $point = $route->activeFlowRoutePoints()->first();
+        $capability = $point !== null
+            ? FlowRouteCapability::query()->active()->find($point->flow_route_capability_id)
+            : null;
+        $definition = $capability instanceof FlowRouteCapability
+            ? ($this->capabilities->definitions()[$capability->key] ?? null)
+            : null;
+
+        if (! $definition instanceof AutomationCapabilityDefinition
+            || $point->type !== $definition->pointType
+            || $capability->point_type !== $definition->pointType
+            || $this->inlineFields($definition) === null
+        ) {
+            return false;
+        }
+
+        $conditions = data_get($route->meta, 'definition.entry_conditions');
+
+        if (! is_array($conditions) || count($conditions) !== 3) {
+            return false;
+        }
+
+        $expected = [
+            FormSubmissionAutomationTriggerAuthoringContributor::FORM_KEY_EVENT_PATH => trim($formKey),
+            FormSubmissionAutomationTriggerAuthoringContributor::CONTEXT_KEY_EVENT_PATH => $context->key,
+            FormSubmissionAutomationTriggerAuthoringContributor::CONTEXT_REFERENCE_EVENT_PATH => (string) $context->reference,
+        ];
+
+        foreach ($conditions as $condition) {
+            if (! is_array($condition)
+                || ($condition['source'] ?? null) !== 'execution_meta'
+                || ($condition['operator'] ?? null) !== 'equals'
+            ) {
+                return false;
+            }
+
+            $path = $condition['path'] ?? null;
+
+            if (! is_string($path)
+                || ! array_key_exists($path, $expected)
+                || ! is_scalar($condition['value'] ?? null)
+                || (string) $condition['value'] !== $expected[$path]
+            ) {
+                return false;
+            }
+
+            unset($expected[$path]);
+        }
+
+        return $expected === [];
+    }
+
+    public function setEnabled(
+        string $formKey,
+        bool $contactAvailable,
+        int $automationId,
+        bool $enabled,
+        ?HostedFormContextReference $context,
+    ): void {
+        $route = $automationId > 0
+            ? FlowRoute::query()
+                ->currentVersion()
+                ->forAutomationEvent(FormSubmissionAutomationTriggerAuthoringContributor::EVENT_KEY)
+                ->find($automationId)
+            : null;
+
+        if (! $route instanceof FlowRoute || ! $this->manageable($route, $formKey, $context)) {
+            throw ValidationException::withMessages([
+                'quick_action' => 'This action cannot be managed here. Open Advanced automation.',
+            ]);
+        }
+
+        if ($enabled && ! $contactAvailable) {
+            throw ValidationException::withMessages([
+                'quick_action' => 'This form does not currently map submissions to Contacts.',
+            ]);
+        }
+
+        if ($enabled) {
+            $this->activation->enable($route);
+
+            return;
+        }
+
+        DB::transaction(function () use ($route): void {
+            $this->activation->disable($route);
+            $route->forceFill(['is_active' => false])->save();
         });
     }
 

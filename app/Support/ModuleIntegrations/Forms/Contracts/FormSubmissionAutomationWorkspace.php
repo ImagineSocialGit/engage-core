@@ -26,7 +26,8 @@ interface FormSubmissionAutomationWorkspace
      *         step_count: int,
      *         url: string,
      *         scope: string,
-     *         scope_label: string
+     *         scope_label: string,
+     *         quick_manageable: bool
      *     }>
      * }
      */
@@ -55,4 +56,18 @@ interface FormSubmissionAutomationWorkspace
         ?string $contextLabel = null,
     ): int;
 
+    /**
+     * Turn an Event-scoped quick action on/off without entering FlowRoutes.
+     * Only one-point behaviors authored by this workspace are eligible.
+     * The caller must supply the trusted Form and hosted context.
+     *
+     * @throws \Illuminate\Validation\ValidationException
+     */
+    public function setQuickActionEnabledForForm(
+        string $formKey,
+        bool $contactAvailable,
+        int $automationId,
+        bool $enabled,
+        ?HostedFormContextReference $context = null,
+    ): void;
 }

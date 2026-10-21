@@ -4,6 +4,7 @@ namespace Tests\Feature\Forms;
 
 use App\Modules\FlowRoutes\Actions\SyncFlowRouteCapabilitiesAction;
 use App\Modules\FlowRoutes\Models\FlowRoute;
+use App\Modules\FlowRoutes\Services\FlowRoutePointAuthoringService;
 use App\Modules\Forms\Data\HostedFormContextReference;
 use App\Modules\Forms\Models\FormDefinition;
 use App\Modules\Forms\Models\FormVersion;
@@ -141,7 +142,7 @@ class FormSubmissionQuickActionTest extends TestCase
         $workspace = app(FormSubmissionAutomationWorkspace::class);
 
         foreach ([
-            ['core.remove_contact_tag', ['tag' => 'example']],
+            ['flow_routes.custom', ['tag' => 'example']],
             ['core.add_contact_tag', ['tag' => '']],
         ] as [$capability, $input]) {
             try {
@@ -159,4 +160,199 @@ class FormSubmissionQuickActionTest extends TestCase
             }
         }
     }
+
+    public function test_remove_tag_is_an_inline_contextual_behavior(): void
+    {
+        app(SyncFlowRouteCapabilitiesAction::class)->handle();
+        $workspace = app(FormSubmissionAutomationWorkspace::class);
+        $context = new HostedFormContextReference('event', 42);
+
+        $action = collect($workspace->readForForm('event_signup', 'Event signup', true, $context)['actions'])
+            ->firstWhere('key', 'core.remove_contact_tag');
+        $this->assertIsArray($action);
+        $this->assertNotEmpty($action['inline_fields']);
+
+        $id = $workspace->createQuickActionForForm(
+            formKey: 'event_signup',
+            formName: 'Event signup',
+            contactAvailable: true,
+            capabilityKey: 'core.remove_contact_tag',
+            input: ['tag' => 'temporary-lead'],
+            context: $context,
+        );
+
+        $route = FlowRoute::query()->findOrFail($id);
+        $this->assertTrue((bool) $route->is_active);
+        $point = $route->activeFlowRoutePoints()->sole();
+        $this->assertSame('remove_contact_tag', $point->type);
+        $this->assertSame('temporary-lead', $point->definition['tag']);
+    }
+
+    public function test_event_quick_action_can_be_turned_off_and_on_without_losing_its_definition(): void
+    {
+        app(SyncFlowRouteCapabilitiesAction::class)->handle();
+        $workspace = app(FormSubmissionAutomationWorkspace::class);
+        $context = new HostedFormContextReference('event', 42);
+        $id = $workspace->createQuickActionForForm(
+            formKey: 'event_signup',
+            formName: 'Event signup',
+            contactAvailable: true,
+            capabilityKey: 'core.add_contact_tag',
+            input: ['tag' => 'event:test'],
+            context: $context,
+        );
+
+        $this->assertSame(
+            'forms.after_submission',
+            data_get(FlowRoute::query()->findOrFail($id)->meta, 'authoring.source'),
+        );
+
+        $before = collect($workspace->readForForm('event_signup', 'Event signup', true, $context)['automations'])
+            ->firstWhere('id', $id);
+        $this->assertTrue($before['quick_manageable']);
+        $this->assertTrue($before['is_enabled']);
+
+        $workspace->setQuickActionEnabledForForm('event_signup', true, $id, false, $context);
+        $route = FlowRoute::query()->findOrFail($id);
+        $this->assertFalse((bool) $route->is_active);
+        $this->assertFalse($route->activeTriggerBindings()->exists());
+        $this->assertSame('event:test', $route->activeFlowRoutePoints()->sole()->definition['tag']);
+
+        $after = collect($workspace->readForForm('event_signup', 'Event signup', true, $context)['automations'])
+            ->firstWhere('id', $id);
+        $this->assertTrue($after['quick_manageable']);
+        $this->assertFalse($after['is_enabled']);
+
+        $workspace->setQuickActionEnabledForForm('event_signup', true, $id, true, $context);
+        $route->refresh();
+        $this->assertTrue((bool) $route->is_active);
+        $this->assertTrue($route->activeTriggerBindings()->exists());
+    }
+
+    public function test_quick_management_rejects_a_different_event_or_form(): void
+    {
+        app(SyncFlowRouteCapabilitiesAction::class)->handle();
+        $workspace = app(FormSubmissionAutomationWorkspace::class);
+        $context = new HostedFormContextReference('event', 42);
+        $id = $workspace->createQuickActionForForm(
+            formKey: 'event_signup',
+            formName: 'Event signup',
+            contactAvailable: true,
+            capabilityKey: 'core.add_contact_tag',
+            input: ['tag' => 'event:test'],
+            context: $context,
+        );
+
+        foreach ([
+            ['event_signup', new HostedFormContextReference('event', 43)],
+            ['wrong_form', $context],
+            ['event_signup', null],
+        ] as [$formKey, $wrongContext]) {
+            try {
+                $workspace->setQuickActionEnabledForForm($formKey, true, $id, false, $wrongContext);
+                $this->fail('Expected a foreign action management request to be rejected.');
+            } catch (ValidationException) {
+                $this->assertTrue((bool) FlowRoute::query()->findOrFail($id)->is_active);
+            }
+        }
+    }
+
+    public function test_quick_management_does_not_expose_advanced_or_modified_routes(): void
+    {
+        app(SyncFlowRouteCapabilitiesAction::class)->handle();
+        $workspace = app(FormSubmissionAutomationWorkspace::class);
+        $context = new HostedFormContextReference('event', 42);
+        $id = $workspace->createQuickActionForForm(
+            formKey: 'event_signup',
+            formName: 'Event signup',
+            contactAvailable: true,
+            capabilityKey: 'core.add_contact_tag',
+            input: ['tag' => 'event:test'],
+            context: $context,
+        );
+        $route = FlowRoute::query()->findOrFail($id);
+        $meta = $route->meta;
+        $meta['definition']['entry_conditions'][] = [
+            'source' => 'execution_meta',
+            'path' => 'automation_event.payload.unknown',
+            'operator' => 'equals',
+            'value' => 'extra',
+        ];
+        $route->forceFill(['meta' => $meta])->save();
+
+        $presentation = collect($workspace->readForForm('event_signup', 'Event signup', true, $context)['automations'])
+            ->firstWhere('id', $id);
+        $this->assertFalse($presentation['quick_manageable']);
+
+        try {
+            $workspace->setQuickActionEnabledForForm('event_signup', true, $id, false, $context);
+            $this->fail('Expected an edited route to require Advanced automation.');
+        } catch (ValidationException) {
+            $this->assertTrue((bool) $route->fresh()->is_active);
+        }
+    }
+
+    public function test_editing_a_quick_action_in_advanced_revokes_inline_management(): void
+    {
+        app(SyncFlowRouteCapabilitiesAction::class)->handle();
+        $workspace = app(FormSubmissionAutomationWorkspace::class);
+        $context = new HostedFormContextReference('event', 42);
+        $id = $workspace->createQuickActionForForm(
+            formKey: 'event_signup',
+            formName: 'Event signup',
+            contactAvailable: true,
+            capabilityKey: 'core.add_contact_tag',
+            input: ['tag' => 'original'],
+            context: $context,
+        );
+
+        $route = FlowRoute::query()->findOrFail($id);
+        $this->assertSame('forms.after_submission', data_get($route->meta, 'authoring.source'));
+
+        app(FlowRoutePointAuthoringService::class)->update(
+            $route,
+            $route->activeFlowRoutePoints()->sole(),
+            ['tag' => 'edited-in-advanced'],
+        );
+
+        $route->refresh();
+        $this->assertSame('crm', data_get($route->meta, 'authoring.source'));
+        $this->assertSame('edited-in-advanced', $route->activeFlowRoutePoints()->sole()->definition['tag']);
+
+        $automation = collect($workspace->readForForm('event_signup', 'Event signup', true, $context)['automations'])
+            ->firstWhere('id', $id);
+        $this->assertFalse($automation['quick_manageable']);
+
+        try {
+            $workspace->setQuickActionEnabledForForm('event_signup', true, $id, false, $context);
+            $this->fail('Expected an Advanced-edited Route to reject quick management.');
+        } catch (ValidationException) {
+            $this->assertTrue((bool) $route->fresh()->is_active);
+        }
+    }
+
+    public function test_missing_contact_mapping_blocks_reenabling_but_allows_turning_off(): void
+    {
+        app(SyncFlowRouteCapabilitiesAction::class)->handle();
+        $workspace = app(FormSubmissionAutomationWorkspace::class);
+        $context = new HostedFormContextReference('event', 42);
+        $id = $workspace->createQuickActionForForm(
+            formKey: 'event_signup',
+            formName: 'Event signup',
+            contactAvailable: true,
+            capabilityKey: 'core.add_contact_tag',
+            input: ['tag' => 'event:test'],
+            context: $context,
+        );
+        $workspace->setQuickActionEnabledForForm('event_signup', false, $id, false, $context);
+        $this->assertFalse((bool) FlowRoute::query()->findOrFail($id)->is_active);
+
+        try {
+            $workspace->setQuickActionEnabledForForm('event_signup', false, $id, true, $context);
+            $this->fail('Expected reactivation without contact mapping to fail.');
+        } catch (ValidationException) {
+            $this->assertFalse((bool) FlowRoute::query()->findOrFail($id)->is_active);
+        }
+    }
+
 }

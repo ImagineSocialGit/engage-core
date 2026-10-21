@@ -73,6 +73,22 @@ final class FlowRoutesFormSubmissionAutomationWorkspace implements FormSubmissio
         );
     }
 
+    public function setQuickActionEnabledForForm(
+        string $formKey,
+        bool $contactAvailable,
+        int $automationId,
+        bool $enabled,
+        ?HostedFormContextReference $context = null,
+    ): void {
+        $this->quickActions->setEnabled(
+            formKey: $formKey,
+            contactAvailable: $contactAvailable,
+            automationId: $automationId,
+            enabled: $enabled,
+            context: $context,
+        );
+    }
+
     private function actions(
         string $formKey,
         string $formName,
@@ -241,7 +257,9 @@ final class FlowRoutesFormSubmissionAutomationWorkspace implements FormSubmissio
                 context: $context,
             ))
             ->map(function (FlowRoute $route) use (
+                $formKey,
                 $formName,
+                $context,
                 $contextLabel,
             ): array {
                 $scope = $this->contextScope($route);
@@ -258,6 +276,9 @@ final class FlowRoutesFormSubmissionAutomationWorkspace implements FormSubmissio
                     'scope_label' => $contextScoped
                         ? ($contextLabel ?? 'This signup context')
                         : 'All '.$formName.' submissions',
+                    'quick_manageable' => $this->quickActions->manageable(
+                        $route, $formKey, $context,
+                    ),
                 ];
             })
             ->values()

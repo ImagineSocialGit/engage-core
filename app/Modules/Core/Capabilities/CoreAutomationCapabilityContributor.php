@@ -44,6 +44,17 @@ class CoreAutomationCapabilityContributor implements AutomationCapabilityContrib
             description: 'Remove a tag from the current Contact.',
             requiredModules: ['core'],
             sourceVersion: '2026_08_contact_tag_automation',
+            meta: [
+                'guided_surfaces' => [
+                    'forms.after_submission' => [
+                        'label' => 'Remove a tag',
+                        'detail' => 'Remove an existing Contact tag after this form is submitted.',
+                        'name_prefix' => 'Remove tag after',
+                        'sort_order' => 20,
+                        'inline_authoring' => true,
+                    ],
+                ],
+            ],
         );
     }
 }
