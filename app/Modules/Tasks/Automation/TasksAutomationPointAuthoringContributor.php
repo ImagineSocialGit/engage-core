@@ -66,7 +66,7 @@ class TasksAutomationPointAuthoringContributor implements AutomationPointAuthori
             ];
         }
 
-        return [
+        $fields = [
             ...$fields,
             [
                 'type' => 'notice',
@@ -93,6 +93,14 @@ class TasksAutomationPointAuthoringContributor implements AutomationPointAuthori
                     ])->all(),
             ],
         ];
+
+        // The notice/resource blocks belong to the Advanced editor.
+        // Event signup needs only the active Task Template selector.
+        if (($context->meta['guided_surface'] ?? null) === 'forms.after_submission') {
+            return [end($fields)];
+        }
+
+        return $fields;
     }
 
     public function rules(string $pointType, AutomationPointAuthoringContext $context): array

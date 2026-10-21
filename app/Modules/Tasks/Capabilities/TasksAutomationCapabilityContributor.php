@@ -27,6 +27,7 @@ class TasksAutomationCapabilityContributor implements AutomationCapabilityContri
                         'detail' => 'Create a template-backed Task for the Contact after this form is submitted.',
                         'name_prefix' => 'Follow up after',
                         'sort_order' => 30,
+                        'inline_authoring' => true,
                     ],
                 ],
             ],

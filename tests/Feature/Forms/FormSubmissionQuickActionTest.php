@@ -9,6 +9,17 @@ use App\Modules\Forms\Data\HostedFormContextReference;
 use App\Modules\Forms\Models\FormDefinition;
 use App\Modules\Forms\Models\FormVersion;
 use App\Modules\Forms\Providers\FormsModuleServiceProvider;
+use App\Modules\Tasks\Models\TaskTemplate;
+use App\Modules\Tasks\Providers\TasksModuleServiceProvider;
+use App\Modules\Campaigns\Models\Campaign;
+use App\Modules\Campaigns\Providers\CampaignsModuleServiceProvider;
+use App\Modules\Messaging\Models\MessageTemplatePreset;
+use App\Modules\Messaging\Providers\MessagingModuleServiceProvider;
+use App\Support\AutomationCapabilities\AutomationActionRegistry;
+use App\Support\AutomationCapabilities\AutomationCapabilityRegistry;
+use App\Support\AutomationCapabilities\AutomationPointDefinitionRegistry;
+use App\Support\AutomationCapabilities\AutomationPointAuthoringRegistry;
+use App\Support\ModuleIntegrations\Forms\FlowRoutes\QuickFormSubmissionAutomationService;
 use App\Support\AutomationTriggers\AutomationTriggerAuthoringRegistry;
 use App\Support\ModuleIntegrations\Forms\Contracts\FormSubmissionAutomationWorkspace;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -355,4 +366,137 @@ class FormSubmissionQuickActionTest extends TestCase
         }
     }
 
+
+    public function test_event_follow_up_task_uses_an_active_template_and_existing_route_runtime(): void
+    {
+        $this->registerAfterSignupActionModules();
+        $template = TaskTemplate::factory()->currentContactSubject()->create([
+            'key' => 'event_attendee_follow_up',
+        ]);
+        $result = app(SyncFlowRouteCapabilitiesAction::class)->handle();
+        $this->assertSame([], $result['errors']);
+        $workspace = app(FormSubmissionAutomationWorkspace::class);
+        $context = new HostedFormContextReference('event', 42);
+        $action = collect($workspace->readForForm('event_signup', 'Event signup', true, $context)['actions'])
+            ->firstWhere('key', 'tasks.create_task');
+
+        $this->assertIsArray($action);
+        $this->assertSame(['task_template_key'], array_column($action['inline_fields'], 'name'));
+
+        $id = $workspace->createQuickActionForForm(
+            formKey: 'event_signup',
+            formName: 'Event signup',
+            contactAvailable: true,
+            capabilityKey: 'tasks.create_task',
+            input: ['task_template_key' => $template->key],
+            context: $context,
+        );
+        $route = FlowRoute::query()->findOrFail($id);
+        $point = $route->activeFlowRoutePoints()->sole();
+        $this->assertSame('create_task', $point->type);
+        $this->assertSame($template->key, $point->definition['task_template_key']);
+        $this->assertTrue((bool) $route->is_active);
+        $this->assertTrue(collect($workspace->readForForm('event_signup', 'Event signup', true, $context)['automations'])
+            ->firstWhere('id', $id)['quick_manageable']);
+    }
+
+    public function test_event_campaign_enrollment_uses_an_active_campaign(): void
+    {
+        $this->registerAfterSignupActionModules();
+        $campaign = Campaign::factory()->create(['key' => 'event_follow_up_campaign']);
+        $result = app(SyncFlowRouteCapabilitiesAction::class)->handle();
+        $this->assertSame([], $result['errors']);
+        $workspace = app(FormSubmissionAutomationWorkspace::class);
+        $context = new HostedFormContextReference('event', 42);
+        $action = collect($workspace->readForForm('event_signup', 'Event signup', true, $context)['actions'])
+            ->firstWhere('key', 'campaigns.enroll_contact');
+
+        $this->assertIsArray($action);
+        $this->assertSame(['campaign_key'], array_column($action['inline_fields'], 'name'));
+
+        $id = $workspace->createQuickActionForForm(
+            formKey: 'event_signup',
+            formName: 'Event signup',
+            contactAvailable: true,
+            capabilityKey: 'campaigns.enroll_contact',
+            input: ['campaign_key' => $campaign->key],
+            context: $context,
+        );
+        $route = FlowRoute::query()->findOrFail($id);
+        $point = $route->activeFlowRoutePoints()->sole();
+        $this->assertSame('enroll_campaign', $point->type);
+        $this->assertSame($campaign->key, $point->definition['campaign_key']);
+        $this->assertTrue((bool) $route->is_active);
+        $this->assertTrue(collect($workspace->readForForm('event_signup', 'Event signup', true, $context)['automations'])
+            ->firstWhere('id', $id)['quick_manageable']);
+    }
+
+    public function test_event_message_uses_only_eligible_templates_and_forces_initiatory_mode(): void
+    {
+        $this->registerAfterSignupActionModules();
+        $eligible = MessageTemplatePreset::factory()->create([
+            'name' => 'Event welcome',
+            'meta' => ['route_authoring' => ['eligible' => true]],
+        ]);
+        $ineligible = MessageTemplatePreset::factory()->create([
+            'name' => 'Unapproved message',
+            'meta' => [],
+        ]);
+        $result = app(SyncFlowRouteCapabilitiesAction::class)->handle();
+        $this->assertSame([], $result['errors']);
+        $workspace = app(FormSubmissionAutomationWorkspace::class);
+        $context = new HostedFormContextReference('event', 42);
+        $action = collect($workspace->readForForm('event_signup', 'Event signup', true, $context)['actions'])
+            ->firstWhere('key', 'messaging.send_message');
+
+        $this->assertIsArray($action);
+        $this->assertSame(
+            ['message_role', 'message_template_preset_id'],
+            array_column($action['inline_fields'], 'name'),
+        );
+        $this->assertSame('hidden', $action['inline_fields'][0]['type']);
+        $offeredIds = array_column($action['inline_fields'][1]['options'], 'value');
+        $this->assertContains($eligible->getKey(), $offeredIds);
+        $this->assertNotContains($ineligible->getKey(), $offeredIds);
+
+        $id = $workspace->createQuickActionForForm(
+            formKey: 'event_signup',
+            formName: 'Event signup',
+            contactAvailable: true,
+            capabilityKey: 'messaging.send_message',
+            input: [
+                // Browser-submitted hidden values must not switch to reply mode.
+                'message_role' => 'reply',
+                'message_template_preset_id' => $eligible->getKey(),
+            ],
+            context: $context,
+        );
+        $route = FlowRoute::query()->findOrFail($id);
+        $point = $route->activeFlowRoutePoints()->sole();
+        $this->assertSame('send_message', $point->type);
+        $this->assertSame('initiatory', $point->definition['message_role']);
+        $this->assertSame($eligible->key, $point->definition['message_template_preset_key'] ?? $point->definition['message_template_key'] ?? null);
+        $this->assertTrue((bool) $route->is_active);
+        $this->assertTrue(collect($workspace->readForForm('event_signup', 'Event signup', true, $context)['automations'])
+            ->firstWhere('id', $id)['quick_manageable']);
+    }
+
+    private function registerAfterSignupActionModules(): void
+    {
+        config()->set('modules.enabled', ['forms', 'workflow', 'flow_routes', 'tasks', 'messaging', 'campaigns']);
+        $this->app->register(TasksModuleServiceProvider::class);
+        $this->app->register(MessagingModuleServiceProvider::class);
+        $this->app->register(CampaignsModuleServiceProvider::class);
+
+        foreach ([
+            AutomationActionRegistry::class,
+            AutomationCapabilityRegistry::class,
+            AutomationPointDefinitionRegistry::class,
+            AutomationPointAuthoringRegistry::class,
+            QuickFormSubmissionAutomationService::class,
+            FormSubmissionAutomationWorkspace::class,
+        ] as $binding) {
+            $this->app->forgetInstance($binding);
+        }
+    }
 }

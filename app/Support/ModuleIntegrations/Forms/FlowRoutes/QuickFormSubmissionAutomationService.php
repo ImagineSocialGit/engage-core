@@ -61,7 +61,10 @@ final class QuickFormSubmissionAutomationService
             return null;
         }
 
-        $context = new AutomationPointAuthoringContext(capability: $capability);
+        $context = new AutomationPointAuthoringContext(
+            capability: $capability,
+            meta: ['guided_surface' => self::SURFACE],
+        );
 
         if (! $this->pointAuthoring->available($definition->pointType, $context)) {
             return null;
@@ -75,13 +78,21 @@ final class QuickFormSubmissionAutomationService
 
         foreach ($fields as $field) {
             if (! is_array($field)
-                || ! in_array($field['type'] ?? null, ['text', 'select', 'textarea'], true)
+                || ! in_array($field['type'] ?? null, ['text', 'select', 'textarea', 'hidden'], true)
                 || preg_match('/\A[a-z][a-z0-9_]*\z/D', (string) ($field['name'] ?? '')) !== 1
             ) {
                 return null;
             }
 
             if (($field['type'] ?? null) === 'select' && ! is_array($field['options'] ?? null)) {
+                return null;
+            }
+
+            // Hidden guided values are constants supplied by the module,
+            // not configurable values accepted from the browser.
+            if (($field['type'] ?? null) === 'hidden'
+                && (! is_string($field['value'] ?? null) || trim($field['value']) === '')
+            ) {
                 return null;
             }
         }
@@ -124,6 +135,15 @@ final class QuickFormSubmissionAutomationService
         $pointContext = new AutomationPointAuthoringContext(capability: $capability);
         $allowedFields = array_column($fields, 'name');
         $values = array_intersect_key($input, array_flip($allowedFields));
+
+        // Never trust a posted hidden value. It must be defined by the
+        // module-owned guided field projection (for example, initiatory
+        // rather than inbound-reply messaging).
+        foreach ($fields as $field) {
+            if ($field['type'] === 'hidden') {
+                $values[$field['name']] = $field['value'];
+            }
+        }
         $values = Validator::make(
             $values,
             $this->pointAuthoring->rules($definition->pointType, $pointContext),

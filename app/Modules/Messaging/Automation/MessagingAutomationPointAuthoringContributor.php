@@ -52,6 +52,43 @@ class MessagingAutomationPointAuthoringContributor implements AutomationPointAut
     {
         $role = $this->role($definition);
         $availableChannels = $this->availableChannels();
+
+        if (($context->meta['guided_surface'] ?? null) === 'forms.after_submission') {
+            // A Form submission starts a conversation; it does not provide
+            // the inbound-message context required for reply mode. Reuse
+            // the same eligible preset catalog and full buildDefinition()
+            // validation as the advanced Route authoring surface.
+            $presets = $this->eligibility->eligiblePresets()
+                ->filter(fn (MessageTemplatePreset $preset): bool =>
+                    in_array((string) $preset->channel, $availableChannels, true));
+
+            if ($presets->isEmpty()) {
+                return [];
+            }
+
+            return [
+                [
+                    'type' => 'hidden',
+                    'name' => 'message_role',
+                    'value' => SendMessageAutomationDefinition::ROLE_INITIATORY,
+                ],
+                [
+                    'type' => 'select',
+                    'name' => 'message_template_preset_id',
+                    'label' => 'Message template',
+                    'required' => true,
+                    'placeholder' => 'Choose an existing message',
+                    'help' => 'Use an eligible reusable message. Messaging still enforces consent, suppressions, and delivery rules.',
+                    'options' => $presets
+                        ->map(fn (MessageTemplatePreset $preset): array => [
+                            'value' => (int) $preset->getKey(),
+                            'label' => $this->displayLabels->selectionLabel($preset),
+                            'description' => (string) $preset->channel.' · '.Str::headline((string) $preset->purpose),
+                        ])->values()->all(),
+                ],
+            ];
+        }
+
         $replyAvailable = $this->replyAvailable($definition, $context);
         $fields = [[
             'type' => 'select',

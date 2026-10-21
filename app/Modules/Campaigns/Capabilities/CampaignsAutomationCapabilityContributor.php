@@ -27,6 +27,7 @@ class CampaignsAutomationCapabilityContributor implements AutomationCapabilityCo
                         'detail' => 'Start a selected Campaign after this form is submitted.',
                         'name_prefix' => 'Enroll after',
                         'sort_order' => 20,
+                        'inline_authoring' => true,
                     ],
                 ],
             ],

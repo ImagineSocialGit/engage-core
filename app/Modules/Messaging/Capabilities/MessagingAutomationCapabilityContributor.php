@@ -27,6 +27,7 @@ class MessagingAutomationCapabilityContributor implements AutomationCapabilityCo
                         'detail' => 'Send a reusable message automatically after this form is submitted.',
                         'name_prefix' => 'Reply after',
                         'sort_order' => 40,
+                        'inline_authoring' => true,
                     ],
                 ],
             ],
