@@ -859,6 +859,7 @@
 │   │   │   │   └── Middleware
 │   │   │   │       └── AuthenticateExternalFormIntake.php
 │   │   │   ├── Models
+│   │   │   │   ├── FormContextVersion.php
 │   │   │   │   ├── FormDefinition.php
 │   │   │   │   ├── FormSubmission.php
 │   │   │   │   ├── FormSubmissionValue.php
@@ -885,6 +886,7 @@
 │   │   │   │   ├── HostedFormLayoutResolver.php
 │   │   │   │   ├── HostedFormPresenter.php
 │   │   │   │   ├── HostedFormRuntimeValidator.php
+│   │   │   │   ├── ManagedHostedFormCustomization.php
 │   │   │   │   └── PublishedFormResolver.php
 │   │   │   ├── Support
 │   │   │   └── Validation
@@ -2259,7 +2261,8 @@
 │   │   │   │   ├── Events
 │   │   │   │   │   └── EventHostedFormContextResolver.php
 │   │   │   │   ├── FlowRoutes
-│   │   │   │   │   └── FlowRoutesFormSubmissionAutomationWorkspace.php
+│   │   │   │   │   ├── FlowRoutesFormSubmissionAutomationWorkspace.php
+│   │   │   │   │   └── QuickFormSubmissionAutomationService.php
 │   │   │   │   ├── FormSubmissionConsentBridge.php
 │   │   │   │   ├── Messaging
 │   │   │   │   │   └── GrantFormSubmissionMessagingConsent.php
@@ -2768,7 +2771,8 @@
 │   │   │   │   ├── 2026_04_15_195880_create_form_definitions_table.php
 │   │   │   │   ├── 2026_04_15_195881_create_form_versions_table.php
 │   │   │   │   ├── 2026_04_15_195882_create_form_submissions_table.php
-│   │   │   │   └── 2026_04_15_195883_create_form_submission_values_table.php
+│   │   │   │   ├── 2026_04_15_195883_create_form_submission_values_table.php
+│   │   │   │   └── 2026_10_20_164400_create_form_context_versions_table.php
 │   │   │   ├── inbound_messaging
 │   │   │   │   ├── 2026_05_19_154535_create_inbound_messages_table.php
 │   │   │   │   ├── 2026_07_19_031500_create_inbound_message_receipts_table.php
@@ -2883,11 +2887,13 @@
 ├── docs
 │   ├── architecture
 │   │   ├── client-packages.md
+│   │   ├── cross-platform-deployment-topology.md
 │   │   └── deployment
 │   │       ├── command-ownership.md
-│   │       ├── deployment-orchestrator-contract.md
-│   │       ├── deployment-plan-and-environment.md
-│   │       └── README.md
+│   │       └── deployment-orchestrator-contract.md
+│   ├── archive
+│   │   └── deployment
+│   │       └── project-state-transfer-runbook.md
 │   ├── automation-opportunities.md
 │   ├── config-templates
 │   │   ├── campaign-presets-template.php
@@ -3026,12 +3032,9 @@
 │   │   ├── crm-user-administration.md
 │   │   ├── deployment-runbook.md
 │   │   ├── deployment-safety-and-troubleshooting.md
-│   │   ├── launch-client-environment.example.conf
 │   │   ├── module-uninstall.md
-│   │   ├── observability
-│   │   │   └── README.md
-│   │   ├── project-state-transfer-runbook.md
-│   │   └── shared-host-staging-horizon.md
+│   │   └── observability
+│   │       └── README.md
 │   ├── possible-scenarios.md
 │   ├── process-highway.md
 │   ├── product-principles.md
@@ -3055,6 +3058,7 @@
 ├── phpunit.xml
 ├── public
 │   ├── favicon.ico
+│   ├── hot
 │   ├── images
 │   │   └── processed
 │   │       ├── brand
@@ -3749,6 +3753,7 @@
 │   │   │   ├── FormSubmissionAutomationEventTest.php
 │   │   │   ├── FormSubmissionConsentIntentResolverTest.php
 │   │   │   ├── FormSubmissionMessagingConsentBridgeTest.php
+│   │   │   ├── FormSubmissionQuickActionTest.php
 │   │   │   ├── FormSubmissionVerificationTest.php
 │   │   │   ├── FormSubmissionWorkspaceTest.php
 │   │   │   ├── HostedFormContextTest.php
@@ -3756,6 +3761,7 @@
 │   │   │   ├── HostedFormRuntimeTest.php
 │   │   │   ├── HostedFormsPublicOriginTest.php
 │   │   │   ├── IssueExternalFormIntakeSecretCommandTest.php
+│   │   │   ├── ManagedHostedFormCustomizationTest.php
 │   │   │   └── PublishedFormRuntimeTest.php
 │   │   ├── HumanVerification
 │   │   │   ├── PublicHumanVerificationSurfaceContractTest.php
@@ -4197,6 +4203,8 @@
 │   │       ├── RecordManualStatusTransitionAutomationBehaviorActionTest.php
 │   │       ├── TransitionContactWorkflowStatusActionTest.php
 │   │       └── WorkflowStatusAutomationOutboxTest.php
+│   ├── Operations
+│   │   └── test_environment_security.py
 │   ├── Support
 │   │   └── UsesSyntheticDeploymentEnvironment.php
 │   ├── TestCase.php
@@ -4208,4 +4216,4 @@
 │               └── PresetCompositionResolverTest.php
 └── vite.config.js
 
-926 directories, 3283 files
+929 directories, 3288 files

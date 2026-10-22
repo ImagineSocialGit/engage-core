@@ -29,9 +29,11 @@ class ModuleManager
             return array_values(array_unique($alwaysOnKeys ?: ['core']));
         }
 
+        // Older, separately deployed client packages may still name this retired
+        // non-feature key. Its bridge provider now boots with the platform.
         $keys = array_values(array_filter(
             array_map('strval', $enabled),
-            fn (string $key): bool => $key !== ''
+            fn (string $key): bool => $key !== '' && $key !== 'integrations'
         ));
 
         return array_values(array_unique([

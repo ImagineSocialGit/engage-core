@@ -30,7 +30,6 @@ use App\Modules\Webinars\MessageTemplates\WebinarMessageTemplateDefinitionContri
 use App\Modules\Webinars\Presets\WebinarsPresetContributor;
 use App\Modules\Webinars\Providers\WebinarsModuleServiceProvider;
 use App\Modules\Workflow\Providers\WorkflowModuleServiceProvider;
-use App\Providers\Modules\IntegrationsModuleServiceProvider;
 
 return [
 
@@ -55,7 +54,6 @@ return [
         'campaigns',
         'broadcasts',
         'webinars',
-        'integrations',
         'reporting',
     ],
 
@@ -969,17 +967,6 @@ return [
             'depends_on' => ['relationships'],
             'providers' => [
                 MortgageModuleServiceProvider::class,
-            ],
-        ],
-
-        'integrations' => [
-            'name' => 'Integrations',
-            'ui' => [
-                'tone' => 'violet',
-            ],
-            'depends_on' => ['core'],
-            'providers' => [
-                IntegrationsModuleServiceProvider::class,
             ],
         ],
 
