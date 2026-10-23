@@ -203,6 +203,7 @@ class BroadcastBulkSchedulingTest extends TestCase
         $broadcast = Broadcast::factory()->scheduled()->create([
             'meta' => [
                 'scheduling' => [
+                    'state' => 'queued',
                     'bulk' => [
                         'enabled' => true,
                         'queue' => QueueContract::BULK_MESSAGES,
@@ -213,22 +214,37 @@ class BroadcastBulkSchedulingTest extends TestCase
             ],
         ]);
 
+        // The queued job must not run before the snapshotted send time.
+        Carbon::setTestNow($broadcast->send_at);
+
         $scheduleChunk = $this->mock(ScheduleBroadcastRecipientChunkAction::class);
         $scheduleChunk
             ->shouldReceive('handle')
             ->once()
             ->with((int) $broadcast->getKey(), true)
-            ->andReturn([
-                'processed_count' => 2,
-                'scheduled_count' => 2,
-                'skipped_count' => 0,
-                'has_more' => true,
-                'release_at' => now(),
-            ]);
+            ->andReturnUsing(function () use ($broadcast): array {
+                $broadcast->forceFill([
+                    'meta' => array_replace_recursive($broadcast->meta ?? [], [
+                        'scheduling' => [
+                            'state' => 'processing',
+                            'last_chunk_index' => 0,
+                            'last_chunk_processed_at' => now()->toISOString(),
+                        ],
+                    ]),
+                ])->save();
+
+                return [
+                    'processed_count' => 2,
+                    'scheduled_count' => 2,
+                    'skipped_count' => 0,
+                    'has_more' => true,
+                    'release_at' => now(),
+                ];
+            });
 
         (new ScheduleBroadcastChunkJob((int) $broadcast->getKey()))->handle(
             $scheduleChunk,
-            app(BulkMessageDeliveryPolicy::class),
+            app(\App\Modules\Broadcasts\Services\BroadcastChunkReleaseSchedule::class),
         );
 
         Queue::assertPushed(

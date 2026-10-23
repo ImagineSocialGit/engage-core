@@ -4,6 +4,7 @@ namespace App\Modules\Broadcasts\Providers;
 
 use App\Modules\Broadcasts\Access\BroadcastsAccessCapabilityContributor;
 use App\Modules\Broadcasts\Contacts\BroadcastContactResultActionContributor;
+use App\Modules\Broadcasts\Jobs\RecoverInterruptedBroadcastChunksJob;
 use App\Modules\Broadcasts\Listeners\MarkBroadcastRecipientFailed;
 use App\Modules\Broadcasts\Listeners\MarkBroadcastRecipientSent;
 use App\Modules\Broadcasts\Listeners\MarkBroadcastRecipientSkipped;
@@ -15,6 +16,7 @@ use App\Modules\Messaging\Contracts\ReusableMessageTemplateAuthoringOptionContri
 use App\Modules\Messaging\Events\ScheduledMessageFailed;
 use App\Modules\Messaging\Events\ScheduledMessageSent;
 use App\Modules\Messaging\Events\ScheduledMessageSkipped;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 
@@ -45,6 +47,16 @@ class BroadcastsModuleServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->callAfterResolving(
+            Schedule::class,
+            function (Schedule $schedule): void {
+                $schedule
+                    ->job(new RecoverInterruptedBroadcastChunksJob())
+                    ->everyMinute()
+                    ->withoutOverlapping();
+            },
+        );
+
         Event::listen(
             ScheduledMessageSent::class,
             MarkBroadcastRecipientSent::class,

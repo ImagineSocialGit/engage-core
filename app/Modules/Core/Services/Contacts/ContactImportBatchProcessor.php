@@ -19,7 +19,6 @@ use App\Modules\Core\Support\Contacts\ContactImportRegistry;
 use App\Modules\Core\Support\Contacts\ContactImportTreatmentRegistry;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 use Throwable;
 
@@ -30,6 +29,7 @@ final class ContactImportBatchProcessor
         private readonly ContactImportRegistry $contactImportRegistry,
         private readonly ContactImportTreatmentRegistry $treatmentRegistry,
         private readonly ContactImportPostProcessorRegistry $postProcessorRegistry,
+        private readonly ContactImportCsvStorage $csvStorage,
     ) {}
 
     public function isRunnable(int $contactImportBatchId): bool
@@ -199,7 +199,7 @@ final class ContactImportBatchProcessor
 
     public function finalizeBatch(int $contactImportBatchId): void
     {
-        $csvPath = DB::transaction(function () use ($contactImportBatchId): ?string {
+        $csvSource = DB::transaction(function () use ($contactImportBatchId): ?array {
             $run = ContactImportRun::query()
                 ->where('contact_import_batch_id', $contactImportBatchId)
                 ->lockForUpdate()
@@ -226,10 +226,10 @@ final class ContactImportBatchProcessor
                 ->findOrFail($contactImportBatchId);
 
             if ($batch->status === ContactImportBatch::STATUS_COMPLETED) {
-                $path = $run->csv_path;
+                $source = $this->csvSource($run);
                 $run->delete();
 
-                return is_string($path) ? $path : null;
+                return $source;
             }
 
             if ($batch->status === ContactImportBatch::STATUS_FAILED) {
@@ -267,14 +267,20 @@ final class ContactImportBatchProcessor
                 ),
             ])->save();
 
-            $path = $run->csv_path;
+            $source = $this->csvSource($run);
             $run->delete();
 
-            return is_string($path) ? $path : null;
+            return $source;
         }, 3);
 
-        if (is_string($csvPath) && $csvPath !== '') {
-            Storage::disk('local')->delete($csvPath);
+        if (is_array($csvSource)) {
+            try {
+                $this->csvStorage->delete($csvSource['path'], $csvSource['disk']);
+            } catch (Throwable $exception) {
+                // Once committed, completion must never be reversed by an
+                // unavailable object-store cleanup. Report the orphan instead.
+                report($exception);
+            }
         }
 
         if (ContactImportBatch::query()
@@ -677,13 +683,15 @@ final class ContactImportBatchProcessor
     {
         $csvPath = (string) $run->csv_path;
 
-        if ($csvPath === '' || ! Storage::disk('local')->exists($csvPath)) {
+        $csvDisk = $this->csvDisk($run);
+
+        if ($csvPath === '' || ! $this->csvStorage->exists($csvPath, $csvDisk)) {
             throw new RuntimeException(
                 "Staged CSV for Contact import batch [{$run->contact_import_batch_id}] is unavailable.",
             );
         }
 
-        $handle = fopen(Storage::disk('local')->path($csvPath), 'r');
+        $handle = $this->csvStorage->open($csvPath, $csvDisk);
 
         if ($handle === false) {
             throw new RuntimeException(
@@ -723,6 +731,23 @@ final class ContactImportBatchProcessor
         } finally {
             fclose($handle);
         }
+    }
+
+    private function csvDisk(ContactImportRun $run): string
+    {
+        // Runs created before the csv_disk migration used local-only storage.
+        $disk = $run->csv_disk;
+
+        return is_string($disk) && trim($disk) !== '' ? $disk : 'local';
+    }
+
+    /** @return array{path: string, disk: string} */
+    private function csvSource(ContactImportRun $run): array
+    {
+        return [
+            'path' => (string) $run->csv_path,
+            'disk' => $this->csvDisk($run),
+        ];
     }
 
     /**

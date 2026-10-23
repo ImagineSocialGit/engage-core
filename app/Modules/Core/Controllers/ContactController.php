@@ -19,6 +19,7 @@ use App\Modules\Core\Data\Contacts\ContactPanel;
 use App\Modules\Core\Data\Contacts\ContactResultAction;
 use App\Modules\Core\Requests\StoreContactRequest;
 use App\Modules\Core\Requests\UpdateContactRequest;
+use App\Modules\Core\Services\Contacts\ContactImportCsvStorage;
 use App\Modules\Core\Services\Contacts\ContactImportHeaderMapper;
 use App\Modules\Core\Services\Contacts\ContactImportProfileRegistry;
 use App\Modules\Core\Services\Contacts\ContactIndexFilterService;
@@ -33,7 +34,6 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -518,7 +518,7 @@ class ContactController extends Controller
 
         $importMode = $this->normalizeImportMode($validated['mode'] ?? null);
         $originalFilename = $validated['csv']->getClientOriginalName();
-        $storedPath = $validated['csv']->store('imports', 'local');
+        $storedPath = app(ContactImportCsvStorage::class)->store($validated['csv']);
 
         $request->session()->put(
             $this->importOriginalFilenameSessionKey($storedPath),
@@ -580,7 +580,7 @@ class ContactController extends Controller
         ContactImportTreatmentRegistry $treatmentRegistry,
         ContactImportPostProcessorRegistry $postProcessorRegistry,
     ): View|RedirectResponse {
-        if (! Storage::disk('local')->exists($storedPath)) {
+        if (! app(ContactImportCsvStorage::class)->exists($storedPath)) {
             return redirect()
                 ->route('crm.contacts.import')
                 ->withErrors([
@@ -604,7 +604,7 @@ class ContactController extends Controller
             $request->session()->get($this->importModeSessionKey($storedPath)),
         );
 
-        $handle = fopen(Storage::disk('local')->path($storedPath), 'r');
+        $handle = app(ContactImportCsvStorage::class)->open($storedPath);
 
         if ($handle === false) {
             return redirect()
@@ -817,7 +817,7 @@ class ContactController extends Controller
 
             $redirect = $csvPath !== null
                 && $this->stagedImportBelongsToSession($request, $csvPath)
-                && Storage::disk('local')->exists($csvPath)
+                && app(ContactImportCsvStorage::class)->exists($csvPath)
                     ? redirect()->route('crm.contacts.import.review', [
                         'csv_path' => $csvPath,
                     ])
@@ -856,13 +856,19 @@ class ContactController extends Controller
         $validated = $request->validate($rules);
         $csvPath = $validated['csv_path'];
 
-        if (! Storage::disk('local')->exists($csvPath)) {
+        if (! $this->stagedImportBelongsToSession($request, $csvPath)) {
+            throw ValidationException::withMessages([
+                'csv_path' => 'That import is not associated with the current session.',
+            ]);
+        }
+
+        if (! app(ContactImportCsvStorage::class)->exists($csvPath)) {
             throw ValidationException::withMessages([
                 'csv_path' => 'The uploaded CSV file could not be found.',
             ]);
         }
 
-        $handle = fopen(Storage::disk('local')->path($csvPath), 'r');
+        $handle = app(ContactImportCsvStorage::class)->open($csvPath);
 
         if ($handle === false) {
             throw ValidationException::withMessages([
@@ -1023,6 +1029,7 @@ class ContactController extends Controller
                 'contact_import_batch_id' => $importBatch->getKey(),
                 'status' => ContactImportRun::STATUS_PENDING,
                 'csv_path' => $csvPath,
+                'csv_disk' => app(ContactImportCsvStorage::class)->disk(),
                 'import_mode' => $importMode,
                 'headers' => $headers,
                 'mapping' => $mapping,

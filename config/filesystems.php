@@ -44,6 +44,21 @@ return [
             'use_path_style_endpoint' => false,
         ],
 
+        // Private, durable originals for the resumable Contact CSV importer.
+        // Never use the public CDN disk for uploaded contact lists.
+        'contact_imports' => [
+            'driver' => 's3',
+            'key' => env('DO_SPACES_KEY'),
+            'secret' => env('DO_SPACES_SECRET'),
+            'region' => env('DO_SPACES_REGION'),
+            'bucket' => env('DO_SPACES_BUCKET'),
+            'endpoint' => env('DO_SPACES_ENDPOINT'),
+            'root' => trim((string) env('CLIENT_KEY', ''), '/').'/private/contact-imports',
+            'visibility' => 'private',
+            'throw' => true,
+            'use_path_style_endpoint' => false,
+        ],
+
         'local' => [
             'driver' => 'local',
             'root' => storage_path('app/private'),

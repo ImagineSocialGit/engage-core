@@ -15,6 +15,17 @@ return [
     |
     */
 
+    'storage' => [
+        // Local developer/test fixtures keep working. All remotely hosted
+        // environments default to a private Spaces-backed disk.
+        'disk' => env(
+            'CONTACT_IMPORT_SOURCE_DISK',
+            in_array(env('APP_ENV', 'production'), ['local', 'testing'], true)
+                ? 'local'
+                : 'contact_imports',
+        ),
+    ],
+
     'processing' => [
         'chunk_rows' => 500,
     ],

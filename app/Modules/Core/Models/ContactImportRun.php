@@ -16,6 +16,7 @@ class ContactImportRun extends Model
         'contact_import_batch_id',
         'status',
         'csv_path',
+        'csv_disk',
         'import_mode',
         'headers',
         'mapping',
