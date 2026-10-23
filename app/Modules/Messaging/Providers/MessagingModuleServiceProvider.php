@@ -32,6 +32,7 @@ use App\Modules\Messaging\Jobs\PruneScheduledMessageCtaEngagementsJob;
 use App\Modules\Messaging\Jobs\PublishScheduledMessageOutboxEventsJob;
 use App\Modules\Messaging\Import\ServiceRelationshipPermissionContactImportPostProcessor;
 use App\Modules\Messaging\Import\ImportEmailSuppressionContactImportHandler;
+use App\Modules\Messaging\Jobs\RecoverOverduePendingScheduledMessagesJob;
 use App\Modules\Messaging\Jobs\RecoverStaleScheduledMessageClaimsJob;
 use App\Modules\Messaging\Listeners\AdvanceMessageChainEnrollmentAfterScheduledMessageTerminal;
 use App\Modules\Messaging\Listeners\GrantManualContactCreatedConsents;
@@ -302,6 +303,11 @@ class MessagingModuleServiceProvider extends ServiceProvider
             function (Schedule $schedule): void {
                 $schedule
                     ->job(new RecoverStaleScheduledMessageClaimsJob())
+                    ->everyMinute()
+                    ->withoutOverlapping();
+
+                $schedule
+                    ->job(new RecoverOverduePendingScheduledMessagesJob())
                     ->everyMinute()
                     ->withoutOverlapping();
 

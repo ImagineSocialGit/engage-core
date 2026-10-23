@@ -36,6 +36,22 @@ class ClaimScheduledMessageForSendingAction
                 return null;
             }
 
+            // A pending row can have a prior provider submission when a
+            // retryable worker was released. Do not let a delayed Redis job
+            // restart that submission after its idempotency guarantee expires.
+            $firstProviderSubmission = $message->deliveryAttempts()
+                ->whereNotNull('provider_submission_started_at')
+                ->orderBy('provider_submission_started_at')
+                ->first();
+
+            if ($firstProviderSubmission instanceof ScheduledMessageDeliveryAttempt
+                && (! filled($message->provider_idempotency_key)
+                    || ! $this->deliveryPolicy
+                        ->canSafelyRetryProviderSubmission($firstProviderSubmission))
+            ) {
+                return null;
+            }
+
             $attemptedAt = now();
             $attemptNumber = ((int) ScheduledMessageDeliveryAttempt::query()
                 ->where('scheduled_message_id', $message->getKey())

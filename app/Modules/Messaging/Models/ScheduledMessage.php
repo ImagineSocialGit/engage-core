@@ -55,6 +55,7 @@ class ScheduledMessage extends Model
         'status',
         'operational_state',
         'manual_schedule_override_at',
+        'pending_recovery_claimed_at',
         'provider_idempotency_key',
         'dedupe_key',
         'meta',
@@ -73,6 +74,7 @@ class ScheduledMessage extends Model
             'payload' => 'array',
             'send_at' => 'datetime',
             'manual_schedule_override_at' => 'datetime',
+            'pending_recovery_claimed_at' => 'datetime',
             'meta' => 'array',
         ];
     }
