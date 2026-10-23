@@ -3,6 +3,8 @@
 namespace App\Modules\Messaging\Providers;
 
 use App\Modules\Core\Events\ManualContactCreated;
+use App\Modules\Core\Data\Contacts\ContactImportField;
+use App\Modules\Core\Support\Contacts\ContactImportRegistry;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Core\Support\Contacts\ContactImportPostProcessorRegistry;
 use App\Modules\Core\Support\Contacts\ContactPanelRegistry;
@@ -29,6 +31,7 @@ use App\Modules\Messaging\Jobs\ProcessDueMessageChainEnrollmentsJob;
 use App\Modules\Messaging\Jobs\PruneScheduledMessageCtaEngagementsJob;
 use App\Modules\Messaging\Jobs\PublishScheduledMessageOutboxEventsJob;
 use App\Modules\Messaging\Import\ServiceRelationshipPermissionContactImportPostProcessor;
+use App\Modules\Messaging\Import\ImportEmailSuppressionContactImportHandler;
 use App\Modules\Messaging\Jobs\RecoverStaleScheduledMessageClaimsJob;
 use App\Modules\Messaging\Listeners\AdvanceMessageChainEnrollmentAfterScheduledMessageTerminal;
 use App\Modules\Messaging\Listeners\GrantManualContactCreatedConsents;
@@ -251,6 +254,41 @@ class MessagingModuleServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Blade::component('messaging.message-media-authoring', MessageMediaAuthoring::class);
+
+        $this->app->make(ContactImportRegistry::class)
+            ->registerFields([
+                ContactImportField::make(
+                    key: 'external_email_status',
+                    label: 'External Email Delivery Status',
+                    section: 'Email Delivery Evidence',
+                    description: 'Only recognized external suppression states prevent delivery. A profile can default this field for an entire cleaned export.',
+                    sort: 1500,
+                    aliases: ['email_delivery_status', 'email_status'],
+                ),
+                ContactImportField::make(
+                    key: 'email_cleaned_at',
+                    label: 'Email Cleaned At',
+                    section: 'Email Delivery Evidence',
+                    description: 'Historical cleanup timestamp. An explicit value indicates suppression evidence.',
+                    sort: 1510,
+                    aliases: ['clean_time', 'cleaned_at'],
+                ),
+                ContactImportField::make(
+                    key: 'email_clean_campaign_id',
+                    label: 'Email Clean Campaign ID',
+                    section: 'Email Delivery Evidence',
+                    sort: 1520,
+                    aliases: ['clean_campaign_id'],
+                ),
+                ContactImportField::make(
+                    key: 'email_clean_campaign_title',
+                    label: 'Email Clean Campaign Title',
+                    section: 'Email Delivery Evidence',
+                    sort: 1530,
+                    aliases: ['clean_campaign_title'],
+                ),
+            ])
+            ->registerHandler(ImportEmailSuppressionContactImportHandler::class);
 
         $this->app->make(ContactImportPostProcessorRegistry::class)
             ->registerProcessor(ServiceRelationshipPermissionContactImportPostProcessor::class);

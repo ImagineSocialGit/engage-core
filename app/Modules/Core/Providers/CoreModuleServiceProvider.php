@@ -24,6 +24,7 @@ use App\Modules\Core\Import\Treatments\ContactTagsImportTreatmentTarget;
 use App\Modules\Core\Import\Treatments\ContactAssignedTeamImportTreatmentTarget;
 use App\Modules\Core\Import\Treatments\ContactAssignedUserImportTreatmentTarget;
 use App\Modules\Core\Import\PostProcessors\ContactImportAssignmentPostProcessor;
+use App\Modules\Core\Import\ContactImportEvidenceHandler;
 use App\Modules\Core\Models\Contact;
 use App\Modules\Core\Models\ContactTag;
 use App\Modules\Core\Events\ManualContactCreated;
@@ -205,6 +206,67 @@ class CoreModuleServiceProvider extends ServiceProvider
                 ),
 
                 ContactImportField::make(
+                    key: 'timezone',
+                    label: 'Timezone',
+                    section: 'Contact Preferences',
+                    description: 'Optional IANA timezone; invalid imported values are retained only as row evidence.',
+                    sort: 110,
+                    aliases: ['time_zone', 'tz'],
+                ),
+
+                ContactImportField::make(
+                    key: 'country_code',
+                    label: 'External Country Code',
+                    section: 'Import Evidence',
+                    description: 'Raw geographic assertion; structured estimates are owned by optional Location.',
+                    sort: 120,
+                    aliases: ['cc', 'country', 'country_iso_code'],
+                ),
+
+                ContactImportField::make(
+                    key: 'region_code',
+                    label: 'External Region Code',
+                    section: 'Import Evidence',
+                    description: 'Raw geographic assertion; never a verified address.',
+                    sort: 130,
+                    aliases: ['region', 'state', 'province'],
+                ),
+
+                ContactImportField::make(
+                    key: 'external_signup_at',
+                    label: 'External Signup Time',
+                    section: 'Import Metadata',
+                    description: 'Historical source evidence only; does not grant message consent.',
+                    sort: 1010,
+                    aliases: ['optin_time', 'opt_in_time', 'signup_time'],
+                ),
+
+                ContactImportField::make(
+                    key: 'external_confirm_at',
+                    label: 'External Confirmation Time',
+                    section: 'Import Metadata',
+                    description: 'Historical confirmation evidence only; does not prove current permission.',
+                    sort: 1020,
+                    aliases: ['confirm_time', 'confirmation_time'],
+                ),
+
+                ContactImportField::make(
+                    key: 'external_id',
+                    label: 'External Record ID',
+                    section: 'Import Metadata',
+                    sort: 1030,
+                    aliases: ['leid', 'external_contact_id'],
+                ),
+
+                ContactImportField::make(
+                    key: 'external_secondary_id',
+                    label: 'External Secondary ID',
+                    section: 'Import Metadata',
+                    sort: 1040,
+                    aliases: ['euid', 'external_unique_id'],
+                ),
+
+                ContactImportField::make(
                     key: 'import_status',
                     label: 'Original Import Status',
                     section: 'Import Metadata',
@@ -279,6 +341,9 @@ class CoreModuleServiceProvider extends ServiceProvider
             ->registerTarget(ContactTagsImportTreatmentTarget::class)
             ->registerTarget(ContactAssignedUserImportTreatmentTarget::class)
             ->registerTarget(ContactAssignedTeamImportTreatmentTarget::class);
+
+        $this->app->make(ContactImportRegistry::class)
+            ->registerHandler(ContactImportEvidenceHandler::class);
 
         $postProcessors->registerProcessor(ContactImportAssignmentPostProcessor::class);
 

@@ -2,7 +2,9 @@
 
 namespace App\Modules\Location\Providers;
 
+use App\Modules\Core\Support\Contacts\ContactImportRegistry;
 use App\Modules\Location\Contracts\LocationNormalizationProvider;
+use App\Modules\Location\Import\ImportContactGeographyHandler;
 use App\Modules\Location\Services\DeterministicLocationNormalizationProvider;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\ServiceProvider;
@@ -53,8 +55,8 @@ class LocationModuleServiceProvider extends ServiceProvider
         );
     }
 
-    public function boot(): void
+    public function boot(ContactImportRegistry $imports): void
     {
-        //
+        $imports->registerHandler(ImportContactGeographyHandler::class);
     }
 }

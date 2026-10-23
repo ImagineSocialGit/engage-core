@@ -12,6 +12,7 @@ class ContactImportField
         public readonly ?string $contactAttribute = null,
         public readonly ?string $description = null,
         public readonly int $sort = 100,
+        public readonly array $aliases = [],
     ) {}
 
     public static function make(
@@ -22,6 +23,7 @@ class ContactImportField
         ?string $contactAttribute = null,
         ?string $description = null,
         int $sort = 100,
+        array $aliases = [],
     ): self {
         return new self(
             key: $key,
@@ -31,6 +33,7 @@ class ContactImportField
             contactAttribute: $contactAttribute,
             description: $description,
             sort: $sort,
+            aliases: $aliases,
         );
     }
 }

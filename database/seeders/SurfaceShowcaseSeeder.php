@@ -201,6 +201,8 @@ class SurfaceShowcaseSeeder extends Seeder
             $this->refs['contact_'.$key] = $this->row('contacts', [
                 'email' => $contact['email'],
             ], $contact + [
+                'timezone' => $key === 'nina' ? 'America/New_York' : 'America/Chicago',
+                'timezone_source' => 'import',
                 'contact_import_batch_id' => $this->refs['import_batch'],
                 'assigned_user_id' => $key === 'marcus' ? $this->refs['loan_officer'] : $this->refs['owner'],
                 'assigned_team_id' => $this->refs['team'] ?? null,

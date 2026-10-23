@@ -29,6 +29,8 @@ class Contact extends Model
         'email',
         'phone',
         'birthday',
+        'timezone',
+        'timezone_source',
         'source',
         'subsource',
         'contact_import_batch_id',

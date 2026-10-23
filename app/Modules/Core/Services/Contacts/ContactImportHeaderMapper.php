@@ -197,6 +197,7 @@ final class ContactImportHeaderMapper
             $field->key,
             $field->label,
             ...(self::ALIASES[$field->key] ?? []),
+            ...$field->aliases,
         ])
             ->map(fn (string $value): string => $this->normalize($value))
             ->filter()
@@ -225,6 +226,7 @@ final class ContactImportHeaderMapper
             $field->key,
             $field->label,
             ...(self::ALIASES[$field->key] ?? []),
+            ...$field->aliases,
         ])
             ->map(fn (string $value): string => $this->normalize($value))
             ->filter(fn (string $value): bool => mb_strlen($value) >= 5)
