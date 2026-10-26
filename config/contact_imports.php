@@ -30,5 +30,14 @@ return [
         'chunk_rows' => 500,
     ],
 
+    'recovery' => [
+        // Only imports with no durable checkpoint movement for this long
+        // can be redispatched. Keep above the chunk/finalization job timeout.
+        'stale_after_seconds' => (int) env('CONTACT_IMPORT_RECOVERY_STALE_SECONDS', 300),
+        // A failed Redis handoff can be attempted again once this claim ages.
+        'redispatch_after_seconds' => (int) env('CONTACT_IMPORT_RECOVERY_RETRY_SECONDS', 300),
+        'max_per_run' => (int) env('CONTACT_IMPORT_RECOVERY_MAX_PER_RUN', 25),
+    ],
+
     'profiles' => [],
 ];

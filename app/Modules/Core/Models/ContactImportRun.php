@@ -34,6 +34,7 @@ class ContactImportRun extends Model
         'started_at',
         'finalizing_at',
         'failed_at',
+        'recovery_dispatched_at',
         'failure_reason',
     ];
 

@@ -32,6 +32,7 @@ use App\Modules\Core\Listeners\RecordManualContactCreatedAutomationEvent;
 use App\Modules\Core\ModuleFacts\CoreContactModuleFactProvider;
 use App\Modules\Core\Observers\ContactEligibilityFactObserver;
 use App\Modules\Core\Observers\ContactTagEligibilityFactObserver;
+use App\Modules\Core\Services\Contacts\RecoverStalledContactImports;
 use App\Modules\Core\Services\Contacts\Filters\ImportBatchContactFilterCriterion;
 use App\Modules\Core\Services\Contacts\Filters\SourceContactFilterCriterion;
 use App\Modules\Core\Services\Contacts\Filters\SubsourceContactFilterCriterion;
@@ -50,6 +51,7 @@ use App\Modules\Core\Validation\CoreSetupValidationContributor;
 use App\Modules\Core\Validation\PublicHumanVerificationSetupValidationContributor;
 use App\Support\ProcessHighway\ProcessHighwayEntryRampInspector;
 use App\Support\ModuleFacts\ModuleFactRegistry;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Event;
@@ -351,6 +353,17 @@ class CoreModuleServiceProvider extends ServiceProvider
             $this->commands([
                 SyncContactStatusPresetsCommand::class,
             ]);
+
+            $this->callAfterResolving(
+                Schedule::class,
+                function (Schedule $schedule): void {
+                    $schedule
+                        ->call(fn () => app(RecoverStalledContactImports::class)->recover())
+                        ->name('core:recover-stalled-contact-imports')
+                        ->everyMinute()
+                        ->withoutOverlapping(5);
+                },
+            );
         }
     }
 }
