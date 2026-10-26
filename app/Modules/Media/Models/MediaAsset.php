@@ -69,6 +69,8 @@ class MediaAsset extends Model
             'uploaded_by_id' => 'integer',
             'size_bytes' => 'integer',
             'ingested_at' => 'datetime',
+            'image_variants_recovery_dispatched_at' => 'datetime',
+            'video_ingestion_recovery_dispatched_at' => 'datetime',
             'image_width' => 'integer',
             'image_height' => 'integer',
             'meta' => 'array',

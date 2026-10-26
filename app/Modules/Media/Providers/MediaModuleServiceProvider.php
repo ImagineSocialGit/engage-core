@@ -2,6 +2,7 @@
 
 namespace App\Modules\Media\Providers;
 
+use App\Modules\Media\Actions\RecoverLostMediaProcessingJobsAction;
 use App\Modules\Media\Console\Commands\BackfillMediaImageFingerprintsCommand;
 use App\Modules\Media\Contracts\ReusableMediaImageAuthoring;
 use App\Modules\Media\Contracts\ReusableMediaImageLibrary;
@@ -12,6 +13,7 @@ use App\Modules\Media\Services\DatabaseReusableMediaImageLibrary;
 use App\Modules\Media\Validation\MediaSetupValidationContributor;
 use App\Support\ModuleIntegrations\Messaging\Contracts\MessageAttachmentSource;
 use App\Support\ModuleIntegrations\Messaging\Media\MediaMessageAttachmentSource;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\ServiceProvider;
 
 final class MediaModuleServiceProvider extends ServiceProvider
@@ -41,6 +43,19 @@ final class MediaModuleServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->callAfterResolving(
+            Schedule::class,
+            function (Schedule $schedule): void {
+                $schedule
+                    ->call(function (): void {
+                        app(RecoverLostMediaProcessingJobsAction::class)->handle();
+                    })
+                    ->name('media:recover-lost-processing-jobs')
+                    ->everyMinute()
+                    ->withoutOverlapping();
+            },
+        );
+
         if ($this->app->runningInConsole()) {
             $this->commands([
                 BackfillMediaImageFingerprintsCommand::class,
