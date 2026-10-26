@@ -5,7 +5,6 @@ namespace App\Modules\FlowRoutes\Actions;
 use App\Modules\FlowRoutes\Models\ContactFlowRouteProgress;
 use App\Modules\FlowRoutes\Models\FlowRoute;
 use App\Modules\FlowRoutes\Models\FlowRoutePoint;
-use App\Modules\FlowRoutes\Services\FlowRouteProgressMetaCanonicalizer;
 use App\Modules\FlowRoutes\Services\FlowRouteTriggerBindingResolver;
 use App\Modules\Workflow\Data\ContactWorkflowStatusTransition;
 use Illuminate\Support\Facades\DB;
@@ -15,7 +14,7 @@ class StartFlowRouteProgressAction
     public function __construct(
         private readonly FlowRouteTriggerBindingResolver $flowRouteTriggerBindingResolver,
         private readonly CreateContactFlowRoutePlanAction $createContactFlowRoutePlan,
-        private readonly FlowRouteProgressMetaCanonicalizer $progressMetaCanonicalizer,
+        private readonly EnsureFlowRouteInlineRecoveryMarkerAction $ensureInlineRecoveryMarker,
     ) {}
 
     public function handle(ContactWorkflowStatusTransition $transition): ?ContactFlowRouteProgress
@@ -52,7 +51,7 @@ class StartFlowRouteProgressAction
                 'current_flow_route_point_id' => $currentFlowRoutePoint?->getKey(),
                 'status' => ContactFlowRouteProgress::STATUS_ACTIVE,
                 'started_at' => $transition->occurredAt,
-                'meta' => $this->progressMetaCanonicalizer->forPersistence([
+                'meta' => $this->ensureInlineRecoveryMarker->forRunnableProgress([
                     'started_from_workflow_transition' => [
                         'from_contact_status_id' => $transition->fromContactStatusId,
                         'to_contact_status_id' => $transition->toContactStatusId,
@@ -62,7 +61,7 @@ class StartFlowRouteProgressAction
                         'actor_id' => $transition->actorId,
                         'changed_at' => $transition->occurredAt->toISOString(),
                     ],
-                ]),
+                ], $currentFlowRoutePoint?->getKey()),
             ]);
 
             $this->createContactFlowRoutePlan->handle($progress, $flowRoute);

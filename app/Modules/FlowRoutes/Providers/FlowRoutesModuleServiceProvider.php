@@ -2,6 +2,8 @@
 
 namespace App\Modules\FlowRoutes\Providers;
 
+use App\Modules\FlowRoutes\Actions\RecoverStalledFlowRouteContinuationsAction;
+use App\Modules\FlowRoutes\Actions\ResumeDueFlowRouteProgressAction;
 use App\Modules\FlowRoutes\Authoring\FlowRoutesAutomationPointAuthoringContributor;
 use App\Modules\FlowRoutes\Capabilities\FlowRoutesAutomationCapabilityContributor;
 use App\Modules\FlowRoutes\ConfigContracts\FlowRoutePresetConfigContractTargetProvider;
@@ -32,6 +34,7 @@ use App\Support\AutomationCapabilities\AutomationPointAuthoringRegistry;
 use App\Support\AutomationEvents\Events\AutomationEventRecorded;
 use App\Support\AutomationTriggers\AutomationTriggerAuthoringRegistry;
 use App\Support\ReplyHandling\ReplyProfileDependencyRegistry;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 
@@ -136,6 +139,32 @@ class FlowRoutesModuleServiceProvider extends ServiceProvider
         Event::listen(
             AutomationEventRecorded::class,
             ResumeFlowRoutesFromAutomationEvent::class,
+        );
+
+        // A due wait is durable in MySQL; its delayed Redis job is not.
+        // Perform bounded resumption directly from the recurring scheduler so
+        // Redis loss cannot also erase the recovery invocation.
+        $this->callAfterResolving(
+            Schedule::class,
+            function (Schedule $schedule): void {
+                $schedule
+                    ->call(function (): void {
+                        app(ResumeDueFlowRouteProgressAction::class)->handle(limit: 50);
+                    })
+                    ->name('flow-routes:resume-overdue-waits')
+                    ->everyMinute()
+                    ->withoutOverlapping();
+
+                // Continuation markers live in MySQL even if the Redis job
+                // disappears. The sweep only requeues stale scheduled markers.
+                $schedule
+                    ->call(function (): void {
+                        app(RecoverStalledFlowRouteContinuationsAction::class)->handle(limit: 25);
+                    })
+                    ->name('flow-routes:recover-stalled-continuations')
+                    ->everyMinute()
+                    ->withoutOverlapping();
+            },
         );
 
         if ($this->app->runningInConsole()) {

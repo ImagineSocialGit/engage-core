@@ -18,6 +18,7 @@ class StartFlowRoutesFromAutomationEventAction
         private readonly FlowRouteTriggerBindingResolver $flowRouteTriggerBindingResolver,
         private readonly CreateContactFlowRoutePlanAction $createContactFlowRoutePlan,
         private readonly FlowRouteEntryCriteriaEvaluator $entryCriteriaEvaluator,
+        private readonly EnsureFlowRouteInlineRecoveryMarkerAction $ensureInlineRecoveryMarker,
     ) {}
 
     public function handle(FlowRouteExternalEvent $event): void
@@ -111,9 +112,10 @@ class StartFlowRoutesFromAutomationEventAction
                 'current_flow_route_point_id' => $currentFlowRoutePoint?->getKey(),
                 'status' => ContactFlowRouteProgress::STATUS_ACTIVE,
                 'started_at' => $event->occurredAt ?? now(),
-                'meta' => [
-                    'started_from_automation_event' => $event->persistenceReference(),
-                ],
+                'meta' => $this->ensureInlineRecoveryMarker->forRunnableProgress(
+                    ['started_from_automation_event' => $event->persistenceReference()],
+                    $currentFlowRoutePoint?->getKey(),
+                ),
             ]);
 
             $this->createContactFlowRoutePlan->handle($progress, $flowRoute);

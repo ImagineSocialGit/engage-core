@@ -15,6 +15,7 @@ class ExecuteFlowRouteProgressUntilIdleAction
 
     public function __construct(
         private readonly ExecuteCurrentFlowRoutePointAction $executeCurrentFlowRoutePoint,
+        private readonly EnsureFlowRouteInlineRecoveryMarkerAction $ensureInlineRecoveryMarker,
         private readonly FlowRouteProgressMetaCanonicalizer $progressMetaCanonicalizer,
     ) {}
 
@@ -26,6 +27,11 @@ class ExecuteFlowRouteProgressUntilIdleAction
         string $source = 'inline',
         array $executionMeta = [],
     ): PointExecutionResult {
+        // This marker commits before the first point is evaluated. If the
+        // PHP process disappears mid-chain, the existing MySQL sweep can
+        // reconstruct the missing work without replaying committed points.
+        $this->ensureInlineRecoveryMarker->handle($progress);
+
         $budget = $this->immediateExecutionBudget();
         $attempts = 0;
         $result = null;
@@ -48,7 +54,7 @@ class ExecuteFlowRouteProgressUntilIdleAction
         );
 
         if ($attempts >= $budget && $result->shouldAdvance() && $progress->isActive()) {
-            $this->persistAndScheduleContinuation(
+            $this->scheduleContinuation(
                 progress: $progress,
             );
 
@@ -63,7 +69,7 @@ class ExecuteFlowRouteProgressUntilIdleAction
         return $result;
     }
 
-    private function persistAndScheduleContinuation(
+    public function scheduleContinuation(
         ContactFlowRouteProgress $progress,
     ): void {
         $expectedPointId = $this->nullableInt($progress->current_flow_route_point_id);
@@ -102,7 +108,11 @@ class ExecuteFlowRouteProgressUntilIdleAction
 
             $lockedProgress->forceFill(['meta' => $meta])->save();
 
-            ContinueFlowRouteProgressJob::dispatch($lockedProgress->getKey())
+            ContinueFlowRouteProgressJob::dispatch(
+                $lockedProgress->getKey(),
+                $payload['sequence'],
+                $payload['scheduled_at'],
+            )
                 ->afterCommit();
         });
     }

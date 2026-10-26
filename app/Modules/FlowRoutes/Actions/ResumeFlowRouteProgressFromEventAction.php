@@ -16,6 +16,7 @@ class ResumeFlowRouteProgressFromEventAction
 
     public function __construct(
         private readonly ExecuteFlowRouteProgressUntilIdleAction $executeFlowRouteProgressUntilIdle,
+        private readonly EnsureFlowRouteInlineRecoveryMarkerAction $ensureInlineRecoveryMarker,
     ) {}
 
     public function handle(FlowRouteExternalEvent $event): FlowRouteExternalEventResumeResult
@@ -151,7 +152,12 @@ class ResumeFlowRouteProgressFromEventAction
             $progress->forceFill([
                 'status' => ContactFlowRouteProgress::STATUS_ACTIVE,
                 'resume_at' => null,
-                'meta' => $meta,
+                'meta' => $this->ensureInlineRecoveryMarker->forRunnableProgress(
+                    $meta,
+                    $progress->current_flow_route_point_id !== null
+                        ? (int) $progress->current_flow_route_point_id
+                        : null,
+                ),
             ])->save();
 
             return $progress->refresh();
