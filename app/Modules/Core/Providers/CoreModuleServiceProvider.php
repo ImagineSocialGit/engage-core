@@ -33,6 +33,7 @@ use App\Modules\Core\ModuleFacts\CoreContactModuleFactProvider;
 use App\Modules\Core\Observers\ContactEligibilityFactObserver;
 use App\Modules\Core\Observers\ContactTagEligibilityFactObserver;
 use App\Modules\Core\Services\Contacts\RecoverStalledContactImports;
+use App\Modules\Core\Services\Contacts\RecoverStalledContactImportAutomationEvents;
 use App\Modules\Core\Services\Contacts\Filters\ImportBatchContactFilterCriterion;
 use App\Modules\Core\Services\Contacts\Filters\SourceContactFilterCriterion;
 use App\Modules\Core\Services\Contacts\Filters\SubsourceContactFilterCriterion;
@@ -360,6 +361,12 @@ class CoreModuleServiceProvider extends ServiceProvider
                     $schedule
                         ->call(fn () => app(RecoverStalledContactImports::class)->recover())
                         ->name('core:recover-stalled-contact-imports')
+                        ->everyMinute()
+                        ->withoutOverlapping(5);
+
+                    $schedule
+                        ->call(fn () => app(RecoverStalledContactImportAutomationEvents::class)->recover())
+                        ->name('core:recover-stalled-contact-import-automation-events')
                         ->everyMinute()
                         ->withoutOverlapping(5);
                 },

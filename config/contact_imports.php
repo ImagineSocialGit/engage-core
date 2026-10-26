@@ -39,5 +39,12 @@ return [
         'max_per_run' => (int) env('CONTACT_IMPORT_RECOVERY_MAX_PER_RUN', 25),
     ],
 
+    'automation_events_recovery' => [
+        // Wait past the emitter timeout before reconstructing a lost job.
+        'stale_after_seconds' => (int) env('CONTACT_IMPORT_EVENTS_RECOVERY_STALE_SECONDS', 300),
+        'redispatch_after_seconds' => (int) env('CONTACT_IMPORT_EVENTS_RECOVERY_RETRY_SECONDS', 300),
+        'max_per_run' => (int) env('CONTACT_IMPORT_EVENTS_RECOVERY_MAX_PER_RUN', 25),
+    ],
+
     'profiles' => [],
 ];

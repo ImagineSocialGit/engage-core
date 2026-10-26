@@ -33,6 +33,9 @@ class ContactImportBatch extends Model
         'successful_count',
         'failed_count',
         'meta',
+        'automation_events_cursor',
+        'automation_events_completed_at',
+        'automation_events_recovery_dispatched_at',
     ];
 
     protected $casts = [
@@ -41,6 +44,9 @@ class ContactImportBatch extends Model
         'successful_count' => 'integer',
         'failed_count' => 'integer',
         'meta' => 'array',
+        'automation_events_cursor' => 'integer',
+        'automation_events_completed_at' => 'datetime',
+        'automation_events_recovery_dispatched_at' => 'datetime',
     ];
 
 

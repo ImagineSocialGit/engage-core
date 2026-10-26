@@ -100,6 +100,8 @@ class ContactImportQueuedProcessingTest extends TestCase
         $batch->refresh();
 
         $this->assertSame(ContactImportBatch::STATUS_COMPLETED, $batch->status);
+        $this->assertSame(0, $batch->automation_events_cursor);
+        $this->assertNull($batch->automation_events_completed_at);
         $this->assertSame(3, $batch->successful_count);
         $this->assertSame(0, $batch->failed_count);
         $this->assertSame(3, Contact::query()->count());

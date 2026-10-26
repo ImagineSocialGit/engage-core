@@ -50,10 +50,11 @@ class ModuleMigrationPlanningAndStatusTest extends TestCase
         $this->assertEquals(['core', 'reporting'], $reporting->dependencyOrderedModuleKeys);
         $this->assertEquals(['core', 'reporting'], $reporting->migrationModuleKeys());
 
-        $integrations = app(ModuleMigrationPlanner::class)->forModule('integrations');
+        // Dashboard is a registered, schema-free platform module.
+        $dashboard = app(ModuleMigrationPlanner::class)->forModule('dashboard');
 
-        $this->assertEquals(['core', 'integrations'], $integrations->dependencyOrderedModuleKeys);
-        $this->assertEquals(['core'], $integrations->migrationModuleKeys());
+        $this->assertEquals(['dashboard'], $dashboard->dependencyOrderedModuleKeys);
+        $this->assertEquals([], $dashboard->migrationModuleKeys());
     }
 
     public function test_planner_rejects_unknown_modules_and_dependency_cycles(): void

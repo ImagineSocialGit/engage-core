@@ -257,6 +257,12 @@ final class ContactImportBatchProcessor
             $batch->forceFill([
                 'status' => ContactImportBatch::STATUS_COMPLETED,
                 'contact_count' => (int) $run->total_rows,
+                // Start a new, durable emission cursor only when THIS
+                // finalization commits. Historic completed imports retain
+                // NULL and are never automatically re-triggered on rollout.
+                'automation_events_cursor' => 0,
+                'automation_events_completed_at' => null,
+                'automation_events_recovery_dispatched_at' => null,
                 'meta' => $this->durableBatchMeta(
                     batch: $batch,
                     stats: $stats,

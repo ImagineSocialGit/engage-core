@@ -214,10 +214,17 @@ class ModuleMigrationsSetupValidationContributorTest extends TestCase
 
     public function test_schema_free_enabled_modules_do_not_create_false_migration_errors(): void
     {
-        config()->set('modules.enabled', ['integrations']);
+        config()->set('modules.enabled', ['dashboard']);
 
+        // Core owns schema and must have its installation ledger reconciled.
         $this->assertSame(0, Artisan::call('modules:reconcile', [
-            'module' => 'integrations',
+            'module' => 'core',
+        ]));
+
+        // Dashboard owns no migration scope and needs no installation ledger.
+        $this->assertFalse(app(ModuleMigrationRegistry::class)->hasModule('dashboard'));
+        $this->assertSame(0, Artisan::call('modules:reconcile', [
+            'module' => 'dashboard',
         ]));
 
         $this->assertEquals([], $this->findings());
