@@ -101,31 +101,38 @@ php artisan engage:deployment-plan
 
 Do not add Messaging, Events, Forms, Tasks, Workflow, Commerce, or other modules to a new client without a concrete workflow requiring them.
 
-## 3. Install and develop private Composer packages
+## 3. Scaffold, install, and develop private Composer packages
 
-A package is a **separate Git repository** from Core and from each client. Use the package rules in `docs/architecture/client-packages.md`:
+Use the **single** Core package workflow, documented in `docs/operations/private-package-workflow.md`, after choosing the client. Each package is a separate private Git repository, not part of the Core or client Git histories. All generated package, directory and GitHub repository basenames match.
 
-1. Create or select a private package repository, with package name and PSR-4 namespace checked against its `composer.json`.
-2. Add a VCS repository and package requirement (`dev-main` until a released tag is used) to `client/<core-key>/composer.json`. Install using Composer **inside that selected client**, retaining and committing both `composer.json` and `composer.lock`.
-3. Add its service-provider class to `client/<core-key>/config/client_packages.php` if an always-on integration/library provider is needed. A vertical instead contributes `modules` and any `migrations`, with its module provider in the contributed module definition (not in the always-on `providers` list).
-4. Once Composer reports the package installed, optionally link its local checkout for development:
+Create a new package only once; `--dry-run` performs no mutations:
 
 ```bash
-./scripts/dev-link-package.sh \
-  imagine-social/engage-integration-stripe \
-  /var/www/engage-integration-stripe \
-  holly-hatcher-ef-core
+./scripts/package.sh create engage-integration-stripe \
+  --type integration \
+  --description 'Stripe billing collection adapter for Engage Core' --dry-run
+./scripts/package.sh create engage-integration-stripe \
+  --type integration \
+  --description 'Stripe billing collection adapter for Engage Core'
 ```
 
-Ordinary local source edits then flow through the symlink without Git pushes or Composer updates. Changes to a package's `composer.json`, dependencies or autoload contract require a normal Composer update and re-link. To restore the **lock-pinned** package revision before final release verification:
+For the optional nonprofit vertical, use `--type vertical` with `engage-donations`. Provider-neutral libraries use `--type library`.
+
+With `CLIENT_KEY=holly-hatcher-ef-core` selected in the local Core `.env`, install only the approved package from its published private remote into the **client-owned** nested Composer project:
 
 ```bash
-./scripts/dev-unlink-package.sh \
-  imagine-social/engage-integration-stripe \
-  holly-hatcher-ef-core
+./scripts/package.sh install holly-hatcher-ef-core \
+  /var/www/engage-integration-stripe --dry-run
+./scripts/package.sh install holly-hatcher-ef-core \
+  /var/www/engage-integration-stripe --link
+./scripts/package.sh verify holly-hatcher-ef-core
 ```
 
-Never deploy development symlinks to staging/production. New packages should be scaffolded and validated by the dedicated package creation workflow once added; until then, follow the manual Composer and registration contracts in the package architecture guide. **Do not guess the generated provider/module manifest values.**
+This keeps `composer.json`/`composer.lock` in the client repository, adds the selected-client package manifest from package metadata, and uses the existing local-only link helper. The CLI **refuses** to replace an existing hand-maintained `client_packages.php`; migrate that client deliberately rather than overwriting it.
+
+During development, use `package.sh link` and `package.sh unlink` to switch between local source and the committed lock-pinned package version. Changes to package dependencies/autoload require Composer reconciliation, not only a symlink. Commit the package, client configuration and platform repositories separately. **Never deploy symlinks to staging/production.**
+
+Only after an optional vertical's module definition and schema are implemented, installed and registered should its module key be enabled via `add-client-modules.sh`. Follow the package workflow guide for environment key declarations, metadata sync and safe deployment.
 
 ## 4. Validate the Core development runtime
 
