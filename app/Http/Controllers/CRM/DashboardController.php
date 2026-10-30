@@ -11,6 +11,7 @@ use App\Modules\Messaging\Enums\MessageChannel;
 use App\Modules\Tasks\Models\Task;
 use App\Modules\Tasks\Services\Dashboard\TodayTasksDashboardPanelProvider;
 use App\Modules\Tasks\Services\TaskLinkPresentationResolver;
+use App\Support\Dashboard\DashboardMetricRegistry;
 use App\Support\Dashboard\DashboardPanelRegistry;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -23,7 +24,11 @@ class DashboardController extends Controller
 {
     private const TASK_BROADCAST_MESSAGE_TYPE = 'dashboard_task_list';
 
-    public function index(Request $request, DashboardPanelRegistry $dashboardPanels): View
+    public function index(
+        Request $request,
+        DashboardPanelRegistry $dashboardPanels,
+        DashboardMetricRegistry $dashboardMetrics,
+    ): View
     {
         $panelsBySlot = $dashboardPanels->panelsFor($request);
         $workPanels = $panelsBySlot->get('immediate_work', collect())->values();
@@ -33,6 +38,7 @@ class DashboardController extends Controller
             'heading' => 'Today',
             'subheading' => null,
             'rightNowCards' => $this->rightNowCards($workPanels, $contextPanels),
+            'headlineMetrics' => $dashboardMetrics->metricsFor($request),
             'workPanels' => $workPanels,
             'contextPanels' => $contextPanels,
         ]);

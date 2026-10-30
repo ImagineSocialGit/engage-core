@@ -32,7 +32,24 @@
             </div>
         @endif
 
-        @if(count($rightNowCards) > 0)
+        @if($headlineMetrics->isNotEmpty())
+            <section class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Key metrics">
+                @foreach($headlineMetrics as $metric)
+                    <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" data-dashboard-metric="{{ $metric['key'] }}">
+                        <p class="text-sm font-medium text-slate-600">{{ $metric['label'] }}</p>
+                        <p class="mt-2 text-2xl font-semibold tabular-nums text-slate-950">{{ $metric['display_value'] }}</p>
+                        @if($metric['period'] !== null)
+                            <p class="mt-1 text-xs text-slate-500">{{ $metric['period'] }}</p>
+                        @endif
+                        @if($metric['href'] !== null)
+                            <a href="{{ $metric['href'] }}" class="mt-3 inline-flex text-sm font-semibold text-slate-700 underline underline-offset-4 hover:text-slate-950 focus:outline-none focus:ring-2 focus:ring-slate-500">
+                                View details
+                            </a>
+                        @endif
+                    </div>
+                @endforeach
+            </section>
+        @elseif(count($rightNowCards) > 0)
             <section class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Right now">
                 @foreach($rightNowCards as $card)
                     <button

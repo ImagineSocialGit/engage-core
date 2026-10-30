@@ -3,7 +3,9 @@
 namespace Tests\Feature\Clients;
 
 use App\Providers\ClientServiceProvider;
+use App\Support\Dashboard\Contracts\DashboardMetricProvider;
 use App\Support\Dashboard\Contracts\DashboardPanelProvider;
+use App\Support\Dashboard\DashboardMetricRegistry;
 use App\Support\Dashboard\DashboardPanelRegistry;
 use Illuminate\Http\Request;
 use Tests\TestCase;
@@ -111,6 +113,41 @@ PHP);
         );
     }
 
+    public function test_dashboard_metric_config_resolves_currency_count_and_client_priority(): void
+    {
+        config()->set('modules.enabled', ['dashboard_test']);
+        config()->set('modules.dashboard.metrics', [
+            'keys' => ['dashboard.test.count'],
+            'max' => 1,
+        ]);
+        config()->set('client.dashboard.metrics', [
+            'keys' => ['dashboard.test.count', 'dashboard.test.currency'],
+            'max' => 2,
+            'priorities' => ['dashboard.test.currency' => 200],
+        ]);
+
+        $this->app->tag([
+            CountDashboardTestMetricProvider::class,
+            CurrencyDashboardTestMetricProvider::class,
+        ], DashboardMetricRegistry::providerTag());
+
+        $metrics = app(DashboardMetricRegistry::class)->metricsFor(Request::create('/'));
+
+        $this->assertSame(
+            ['dashboard.test.currency', 'dashboard.test.count'],
+            $metrics->pluck('key')->values()->all(),
+        );
+        $this->assertSame('$12,450.00', $metrics->first()['display_value']);
+        $this->assertSame('1,203', $metrics->last()['display_value']);
+
+        config()->set('client.dashboard.metrics.keys', ['dashboard.test.currency']);
+        config()->set('modules.enabled', []);
+
+        $this->assertTrue(
+            app(DashboardMetricRegistry::class)->metricsFor(Request::create('/'))->isEmpty(),
+        );
+    }
+
     private function makeTempDirectory(): string
     {
         $directory = sys_get_temp_dir().'/engage-core-dashboard-config-'.bin2hex(random_bytes(8));
@@ -190,6 +227,50 @@ final class SecondDashboardTestPanelProvider implements DashboardPanelProvider
             'count' => 1,
             'priority' => 20,
             'items' => [['key' => 'second']],
+        ];
+    }
+}
+
+
+final class CountDashboardTestMetricProvider implements DashboardMetricProvider
+{
+    public function key(): string
+    {
+        return 'dashboard.test.count';
+    }
+
+    public function module(): string
+    {
+        return 'dashboard_test';
+    }
+
+    public function metric(Request $request): array
+    {
+        return ['label' => 'Contacts', 'format' => 'count', 'value' => 1203];
+    }
+}
+
+final class CurrencyDashboardTestMetricProvider implements DashboardMetricProvider
+{
+    public function key(): string
+    {
+        return 'dashboard.test.currency';
+    }
+
+    public function module(): string
+    {
+        return 'dashboard_test';
+    }
+
+    public function metric(Request $request): array
+    {
+        return [
+            'label' => 'Received',
+            'format' => 'currency',
+            'value' => 1245000,
+            'currency' => 'USD',
+            'period' => 'This month',
+            'href' => '/payments',
         ];
     }
 }
