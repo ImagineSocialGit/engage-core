@@ -4,6 +4,8 @@
 
 This is the single operator-facing deployment guide for Engage Core.
 
+For a **new client from first repository creation onward** (Core and optionally SEO), start with `docs/operations/new-client-onboarding.md`, then return here for target-environment launch and lifecycle operations.
+
 Start here for:
 
 - launching a new staging or production environment;

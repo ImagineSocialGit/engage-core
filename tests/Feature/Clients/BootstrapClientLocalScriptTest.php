@@ -77,7 +77,7 @@ class BootstrapClientLocalScriptTest extends TestCase
         $this->assertStringNotContainsString('git commit', $script);
     }
 
-    public function test_local_bootstrap_reproduces_the_proven_local_env_permission_contract(): void
+    public function test_local_bootstrap_restricts_env_files_and_preserves_web_readability(): void
     {
         $script = (string) file_get_contents(
             base_path('scripts/bootstrap-client-local.sh'),
@@ -88,6 +88,18 @@ class BootstrapClientLocalScriptTest extends TestCase
             $script,
         );
         $this->assertStringContainsString(
+            'set_web_group "$ROOT_ENV"',
+            $script,
+        );
+        $this->assertStringContainsString(
+            'set_web_group "$CLIENT_ENV"',
+            $script,
+        );
+        $this->assertStringContainsString(
+            'chmod 0640 "$ROOT_ENV" "$CLIENT_ENV"',
+            $script,
+        );
+        $this->assertStringNotContainsString(
             'chmod 0664 "$ROOT_ENV" "$CLIENT_ENV"',
             $script,
         );
@@ -99,7 +111,6 @@ class BootstrapClientLocalScriptTest extends TestCase
             'sudo -u "$WEB_USER" test -r "$CLIENT_ENV"',
             $script,
         );
-        $this->assertStringNotContainsString('chmod 0640 "$CLIENT_ENV"', $script);
         $this->assertStringContainsString(
             'WEB_GROUP="${ENGAGE_CORE_WEB_GROUP:-www-data}"',
             $script,

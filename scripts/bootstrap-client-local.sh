@@ -19,8 +19,8 @@ It creates/reconciles ignored local runtime state for an already-created client,
 provisions a client-scoped local MySQL database/user, safely selects the client in
 the root local .env, runs the normal install path, and verifies the effective
 runtime under both the developer process and the local PHP-FPM/web user before
-returning success. Local root/client runtime .env files are normalized to mode 0664,
-matching the proven development convention.
+returning success. Local root/client runtime .env files are normalized to mode 0640 and assigned to the
+authorized PHP-FPM group; neither group-write nor world-read is allowed.
 
 Safe local product defaults:
   EMAIL_PROVIDER=resend      when Messaging is enabled and no value exists
@@ -212,7 +212,11 @@ apply_client_config_permissions() {
 }
 
 apply_local_env_permissions() {
-  chmod 0664 "$ROOT_ENV" "$CLIENT_ENV"
+  # The developer owns the files; the PHP-FPM group needs read-only access.
+  # Re-apply group and mode after atomic .env updates, which may replace inodes.
+  set_web_group "$ROOT_ENV"
+  set_web_group "$CLIENT_ENV"
+  chmod 0640 "$ROOT_ENV" "$CLIENT_ENV"
 }
 
 assert_local_env_readability() {

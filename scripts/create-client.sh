@@ -16,6 +16,16 @@ Options:
         basic   Tasks + Workflow. Default.
         artist  Artist client family.
 
+  --modules MODULE[,MODULE...]
+      Override the initial explicit optional-module selection from the starter preset.
+      Example: --modules billing (Core is always on).
+
+  --skip-local-bootstrap
+      Create and push client source without selecting/installing the local runtime.
+
+  --dry-run
+      Validate and preview client creation without creating a Git repository.
+
   --starter-package PACKAGE
       Creation-time starter package for presets that define package choices.
       Artist packages:
@@ -58,6 +68,9 @@ CLIENT_TIMEZONE=""
 CLIENT_NAME=""
 CLIENT_PRESET="basic"
 CLIENT_STARTER_PACKAGE=""
+CLIENT_MODULE_OVERRIDES=""
+SKIP_LOCAL_BOOTSTRAP=false
+DRY_RUN=false
 WEB_GROUP="${ENGAGE_CORE_WEB_GROUP:-www-data}"
 GITHUB_OWNER="${ENGAGE_CORE_GITHUB_OWNER:-ImagineSocialGit}"
 
@@ -78,6 +91,22 @@ while (($#)); do
       }
       CLIENT_PRESET="$2"
       shift 2
+      ;;
+    --modules)
+      [[ $# -ge 2 && -n "$2" ]] || {
+        echo "--modules requires a comma-separated list." >&2
+        exit 1
+      }
+      CLIENT_MODULE_OVERRIDES="$2"
+      shift 2
+      ;;
+    --skip-local-bootstrap)
+      SKIP_LOCAL_BOOTSTRAP=true
+      shift
+      ;;
+    --dry-run)
+      DRY_RUN=true
+      shift
       ;;
     --starter-package)
       [[ $# -ge 2 ]] || {
@@ -306,6 +335,43 @@ fi
 
 CLIENT_RUNTIME_PRESET_PHP="$(php -r 'echo var_export($argv[1], true);' "$CLIENT_RUNTIME_PRESET")"
 
+# Preset families are templates, not forced product bundles. A caller may
+# explicitly replace the initial optional modules without changing the
+# creation-time preset resolver or the runtime preset package.
+if [[ -n "$CLIENT_MODULE_OVERRIDES" ]]; then
+  php -r '
+$definitions = require $argv[1];
+$available = $definitions["modules"] ?? null;
+if (! is_array($available)) {
+    fwrite(STDERR, "Root module definitions are missing.\n");
+    exit(1);
+}
+$requested = explode(",", $argv[2]);
+$selected = [];
+foreach ($requested as $value) {
+    $key = trim($value);
+    if ($key === "" || preg_match("/^[a-z][a-z0-9_]*$/D", $key) !== 1) {
+        fwrite(STDERR, "Invalid optional module key: ".$value."\n");
+        exit(1);
+    }
+    $definition = $available[$key] ?? null;
+    if (! is_array($definition) || ! empty($definition["always_on"])) {
+        fwrite(STDERR, "Module [{$key}] is unknown or always on; only optional built-in modules may be selected at client creation.\n");
+        exit(1);
+    }
+    if (! in_array($key, $selected, true)) {
+        $selected[] = $key;
+    }
+}
+$lines = ["<?php", "", "return [", "    ".chr(39)."enabled".chr(39)." => ["];
+foreach ($selected as $key) {
+    $lines[] = "        ".var_export($key, true).",";
+}
+array_push($lines, "    ],", "];", "");
+file_put_contents($argv[3], implode("\n", $lines), LOCK_EX);
+' "$ROOT_DIR/config/modules.php" "$CLIENT_MODULE_OVERRIDES" "$TEMP_CLIENT_DIR/config/modules.php"
+fi
+
 cat > "$TEMP_CLIENT_DIR/.gitignore" <<'EOF_GITIGNORE'
 .env
 .env.*
@@ -358,6 +424,21 @@ foreach ($enabled as $module) {
 echo implode(", ", $enabled);
 ' "$TEMP_CLIENT_DIR/config/modules.php"
 )"
+
+if [[ "$DRY_RUN" == true ]]; then
+  cat <<EOF_DRY_RUN
+Engage Core client creation preview (no client or GitHub repository created)
+  Client key:       $CLIENT_KEY
+  Client name:      $CLIENT_NAME
+  Local repository: $CLIENT_DIR
+  GitHub repository: $GITHUB_REPOSITORY (private)
+  Preset family:    $CLIENT_PRESET
+  Runtime preset:   $CLIENT_RUNTIME_PRESET
+  Optional modules: $CLIENT_MODULES
+  Bootstrap locally: $([[ "$SKIP_LOCAL_BOOTSTRAP" == true ]] && echo skipped || echo enabled)
+EOF_DRY_RUN
+  exit 0
+fi
 
 cat > "$TEMP_CLIENT_DIR/README.md" <<EOF_README
 # $CLIENT_NAME
@@ -545,6 +626,15 @@ fi
 mv "$TEMP_CLIENT_DIR" "$CLIENT_DIR"
 TEMP_CLIENT_DIR=""
 trap - EXIT
+
+if [[ "$SKIP_LOCAL_BOOTSTRAP" == true ]]; then
+  echo "Client source and private GitHub repository created; local bootstrap was skipped."
+  echo "  Client:     $CLIENT_DIR"
+  echo "  Repository: $GITHUB_SSH_URL"
+  echo "To select and initialize this client later:"
+  echo "  ./scripts/bootstrap-client-local.sh $CLIENT_KEY"
+  exit 0
+fi
 
 LOCAL_BOOTSTRAP="$ROOT_DIR/scripts/bootstrap-client-local.sh"
 
