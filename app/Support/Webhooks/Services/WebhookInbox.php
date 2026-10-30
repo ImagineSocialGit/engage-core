@@ -86,9 +86,45 @@ class WebhookInbox
         return $claimed->fresh() ?? $claimed;
     }
 
-    private function claim(int $receiptId): ?WebhookInboxReceipt
+    /**
+     * Reclaim an existing verified receipt without rebuilding its original
+     * payload fingerprint from MySQL's JSON-normalized representation.
+     *
+     * This is not an ingress method. The receipt must already have been
+     * accepted through a provider-authenticated WebhookInbox::process() call.
+     * Eligibility is checked while holding the receipt's database row lock.
+     *
+     * @param Closure(WebhookInboxReceipt): bool $eligible
+     * @param Closure(WebhookInboxReceipt): mixed $processor
+     */
+    public function recoverStoredReceipt(
+        int $receiptId,
+        Closure $eligible,
+        Closure $processor,
+    ): ?WebhookInboxReceipt {
+        $claimed = $this->claim($receiptId, $eligible);
+
+        if (! $claimed instanceof WebhookInboxReceipt) {
+            return null;
+        }
+
+        try {
+            $outcome = $processor($claimed);
+
+            $this->markCompleted($claimed, $this->normalizeOutcome($outcome));
+        } catch (Throwable $exception) {
+            $this->markRetryableFailed($claimed, $exception);
+
+            throw $exception;
+        }
+
+        return $claimed->fresh() ?? $claimed;
+    }
+
+    /** @param Closure(WebhookInboxReceipt): bool|null $eligible */
+    private function claim(int $receiptId, ?Closure $eligible = null): ?WebhookInboxReceipt
     {
-        return DB::transaction(function () use ($receiptId): ?WebhookInboxReceipt {
+        return DB::transaction(function () use ($receiptId, $eligible): ?WebhookInboxReceipt {
             $receipt = WebhookInboxReceipt::query()
                 ->lockForUpdate()
                 ->find($receiptId);
@@ -102,6 +138,10 @@ class WebhookInbox
             if ($receipt->status === WebhookInboxReceipt::STATUS_PROCESSING
                 && $receipt->claim_expires_at?->isFuture()
             ) {
+                return null;
+            }
+
+            if ($eligible !== null && ! $eligible($receipt)) {
                 return null;
             }
 

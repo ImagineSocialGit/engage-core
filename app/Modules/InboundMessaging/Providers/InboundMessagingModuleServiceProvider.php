@@ -2,6 +2,7 @@
 
 namespace App\Modules\InboundMessaging\Providers;
 
+use App\Modules\InboundMessaging\Actions\RecoverIncompleteInboundWebhooksAction;
 use App\Modules\InboundMessaging\Automation\InboundEmailRouteAutomationTriggerAuthoringContributor;
 use App\Modules\InboundMessaging\Automation\InboundMessagingAutomationPointDefinitionContributor;
 use App\Modules\InboundMessaging\Automation\InboundReplyAutomationTriggerAuthoringContributor;
@@ -25,6 +26,7 @@ use App\Modules\Messaging\Events\AutomationMessageScheduled;
 use App\Support\Dashboard\DashboardPanelRegistry;
 use App\Support\ReplyHandling\ReplyProfileDependencyRegistry;
 use App\Support\ReplyHandling\ReplyProfilePresentationRegistry;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 
@@ -114,6 +116,18 @@ class InboundMessagingModuleServiceProvider extends ServiceProvider
         Event::listen(
             AutomationMessageScheduled::class,
             RecordInboundAutomaticMessage::class,
+        );
+
+        $this->callAfterResolving(
+            Schedule::class,
+            static function (Schedule $schedule): void {
+                $schedule->call(
+                    static fn (): int => app(RecoverIncompleteInboundWebhooksAction::class)->handle(),
+                )
+                    ->name('inbound_messaging.recover_incomplete_webhooks')
+                    ->everyMinute()
+                    ->withoutOverlapping();
+            },
         );
 
         if ($this->app->runningInConsole()) {
