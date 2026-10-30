@@ -78,6 +78,7 @@ ROOT_ENV="$ROOT_DIR/.env"
 CLIENT_DIR="$ROOT_DIR/client/$CLIENT_KEY"
 CLIENT_ENV="$CLIENT_DIR/.env"
 HELPER="$ROOT_DIR/scripts/operations/lib/launch_client_environment.py"
+PERMISSIONS_HELPER="$ROOT_DIR/scripts/operations/lib/client_file_permissions.py"
 
 LOCAL_ROOT_DOMAIN="engagecore.test"
 LOCAL_APP_URL="http://engagecore.test"
@@ -91,6 +92,7 @@ LOCAL_CRM_APP_URL="http://crm.engagecore.test"
 [[ -f "$CLIENT_DIR/config/modules.php" ]] || fail "Client modules config is missing: $CLIENT_DIR/config/modules.php"
 [[ -f "$ROOT_ENV" ]] || fail "Root local environment file does not exist: $ROOT_ENV"
 [[ -f "$HELPER" ]] || fail "Deployment environment helper is missing: $HELPER"
+[[ -f "$PERMISSIONS_HELPER" ]] || fail "Client permissions helper is missing: $PERMISSIONS_HELPER"
 
 for command in php python3 openssl mysql sudo id awk sed rm stat find chgrp chmod; do
   command -v "$command" >/dev/null 2>&1 \
@@ -120,6 +122,7 @@ env_set() {
     --file "$file" \
     --key "$key" \
     --value "$value"
+  apply_local_env_permissions
 }
 
 env_remove() {
@@ -129,6 +132,7 @@ env_remove() {
   python3 "$HELPER" env-remove \
     --file "$file" \
     --key "$key"
+  apply_local_env_permissions
 }
 
 env_set_if_blank() {
@@ -181,42 +185,16 @@ invalidate_client_runtime_caches() {
   rm -f "$ROOT_DIR/bootstrap/cache/routes-"*.php
 }
 
-set_web_group() {
-  local path="$1"
-
-  if chgrp "$WEB_GROUP" "$path" 2>/dev/null; then
-    return
-  fi
-
-  sudo chgrp "$WEB_GROUP" "$path"
-}
-
-set_web_group_recursive() {
-  local path="$1"
-
-  if chgrp -R "$WEB_GROUP" "$path" 2>/dev/null; then
-    return
-  fi
-
-  sudo chgrp -R "$WEB_GROUP" "$path"
-}
-
 apply_client_config_permissions() {
-  local config_dir="$CLIENT_DIR/config"
-
-  set_web_group "$CLIENT_DIR"
-  chmod 2750 "$CLIENT_DIR"
-  set_web_group_recursive "$config_dir"
-  find "$config_dir" -type d -exec chmod 2750 {} +
-  find "$config_dir" -type f -exec chmod 0640 {} +
+  python3 "$PERMISSIONS_HELPER" prepare-config "$CLIENT_DIR" \
+    || fail "Selected client configuration permissions failed; check the exact path above."
 }
 
 apply_local_env_permissions() {
-  # The developer owns the files; the PHP-FPM group needs read-only access.
-  # Re-apply group and mode after atomic .env updates, which may replace inodes.
-  set_web_group "$ROOT_ENV"
-  set_web_group "$CLIENT_ENV"
-  chmod 0640 "$ROOT_ENV" "$CLIENT_ENV"
+  local env_paths=("$ROOT_ENV")
+  [[ -f "$CLIENT_ENV" ]] && env_paths+=("$CLIENT_ENV")
+  python3 "$PERMISSIONS_HELPER" prepare-env "${env_paths[@]}" \
+    || fail "Selected client environment permissions failed; check the exact path above."
 }
 
 assert_local_env_readability() {
@@ -224,12 +202,10 @@ assert_local_env_readability() {
     || fail "Current developer process cannot read root local environment: $ROOT_ENV"
   test -r "$CLIENT_ENV" \
     || fail "Current developer process cannot read selected-client local environment: $CLIENT_ENV"
-
-  sudo -u "$WEB_USER" test -r "$ROOT_ENV" \
-    || fail "Local PHP-FPM/web user [$WEB_USER] cannot read root local environment: $ROOT_ENV"
-  sudo -u "$WEB_USER" test -r "$CLIENT_ENV" \
-    || fail "Local PHP-FPM/web user [$WEB_USER] cannot read selected-client local environment: $CLIENT_ENV"
+  python3 "$PERMISSIONS_HELPER" verify-env "$ROOT_ENV" "$CLIENT_ENV" \
+    || fail "PHP-FPM cannot read selected client environment; check the exact path above."
 }
+
 
 web_environment_context() {
   sudo -u "$WEB_USER" php -r '
@@ -253,10 +229,17 @@ foreach ([
 }
 
 assert_web_application_boot() {
+  python3 "$PERMISSIONS_HELPER" verify-config "$CLIENT_DIR" \
+    || fail "Selected client configuration access failed before Laravel bootstrap."
+  assert_local_env_readability
   if ! sudo -u "$WEB_USER" php "$ROOT_DIR/artisan" about --no-ansi >/dev/null 2>&1; then
-    fail "Local PHP-FPM/web user [$WEB_USER] cannot boot selected client [$CLIENT_KEY]. Verify client config ownership, group, and read/traverse permissions."
+    fail "Local PHP-FPM/web user [$WEB_USER] cannot boot selected client [$CLIENT_KEY]. File readability was verified; inspect the first bootstrap exception using: sudo -u $WEB_USER php $ROOT_DIR/artisan about --no-ansi"
   fi
 }
+
+# Apply the restrictive group policy before the environment helper reads .env.
+# A new client .env will be prepared immediately after creation below.
+apply_local_env_permissions
 
 APP_ENV_VALUE="$(env_get_optional "$ROOT_ENV" APP_ENV)"
 [[ "$APP_ENV_VALUE" == "local" ]] \
@@ -300,10 +283,10 @@ DERIVED_DB_USERNAME="$(bounded_identifier "${RUNTIME_STEM}_local" 32)"
 apply_client_config_permissions
 
 touch "$CLIENT_ENV"
+apply_local_env_permissions
 
-# Local runtime files intentionally follow the proven development convention:
-# developer-owned and mode 0664. Atomic environment writes may replace the
-# inode, so final permissions are applied only after all writes in each phase.
+# Atomic environment writes may replace inodes. env_set/env_remove reapply the
+# developer-owned, group-readable 0640 policy immediately after each write.
 
 # Local host identity is canonical and shared by every selected Core client.
 # Never inherit a production/staging domain or fall back to localhost here.

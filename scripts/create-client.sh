@@ -170,7 +170,7 @@ if [[ ! "$GITHUB_OWNER" =~ ^[A-Za-z0-9][A-Za-z0-9-]*$ ]]; then
   exit 1
 fi
 
-for command in php git gh getent; do
+for command in php python3 git gh getent; do
   if ! command -v "$command" >/dev/null 2>&1; then
     echo "$command is required to create a client and its GitHub repository."
     exit 1
@@ -582,6 +582,11 @@ fi
 
 find "$TEMP_CLIENT_DIR" -type d -exec chmod 2750 {} +
 find "$TEMP_CLIENT_DIR" -type f -exec chmod 0640 {} +
+# Apply the same client-config policy used by bootstrap and package install.
+# The helper also repairs the config setgid bit when the developer does not
+# belong to the web group, then verifies access as the actual PHP-FPM user.
+# The Git checkout root is not normalized by this helper.
+python3 "$ROOT_DIR/scripts/operations/lib/client_file_permissions.py" prepare-config "$TEMP_CLIENT_DIR"
 
 # Initialize and commit while the complete selected preset is still in the
 # temporary location. A failed GitHub repository create therefore does not

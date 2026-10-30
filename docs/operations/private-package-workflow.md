@@ -68,8 +68,37 @@ The installation operation:
 3. Creates `config/client_package_registry.json` as structured, committed registration input and generates `config/client_packages.php`. It registers integration providers under `providers`, vertical modules under `modules`, **migration scopes only after explicitly enabled**, and environment key **definitions** under `environment`. It never inserts secret values. Fresh vertical scaffolds carry `"migration_scope": false` and may be installed without fake migrations.
 4. Adds `/vendor/` to the selected client's `.gitignore` if missing. The client repository must never contain installed dependency binaries/source.
 5. Verifies the Composer installation and class autoloading. `--link` then invokes the existing local symlink helper, leaving `composer.json`/`composer.lock` unchanged. For a registry-only `--sync-metadata` change where Composer requirements and lock are already valid, the installer updates only the managed registry/manifest and preserves an existing matching local symlink; it does not run `composer update`.
+6. Enforces the shared **local** permission policy before linking or reporting success. Only the installer-managed **runtime configuration files** (`config/client_package_registry.json` and `config/client_packages.php`) are assigned the PHP-FPM group and mode `0640`; `config/` is assigned the PHP-FPM group with mode `2750`. The selected-client Git checkout root is **access-checked but never chgrp'd or chmod'd** by the helper. Client `composer.json` and `composer.lock` are build-time source files; they are neither changed nor required to be PHP-FPM-readable. All client configuration is checked under the actual PHP-FPM identity. An unrelated unreadable config file causes a path-specific error, without rewriting unrelated settings. Existing managed config files are repaired when repeating an already-installed operation.
 
 **Preservation rule:** If a client has an existing, hand-maintained `config/client_packages.php` without the managed registry, the installer refuses to overwrite it. Migrate that manifest deliberately using `docs/architecture/client-packages.md`, or continue to manage that client's Composer and manifest by hand. Managed manifests also fail closed if modified independently from the registry. Do not paste a new generated manifest over an existing production client.
+
+## Local runtime file access and diagnostics
+
+The single policy implementation is `scripts/operations/lib/client_file_permissions.py`.
+Local commands honor `ENGAGE_CORE_WEB_USER` and `ENGAGE_CORE_WEB_GROUP` (both default to `www-data`). Do not run the entire workflow with `sudo`; a developer-owned path is required. When the developer cannot assign the PHP-FPM group directly, the helper invokes `sudo chgrp` only for the exact runtime file/directory requiring that group. On Linux, an owner who is not in that group may not be able to retain the `setgid` bit with an ordinary `chmod`; the helper then invokes `sudo chmod` for that exact **config** directory. It does **not** run `chown`, change checkout-root ownership/modes, recursively change `/var/www`, or make client configuration world-readable.
+
+- **Managed package install:** Only `config/` and the two installer-generated config files are normalized. The client checkout root is checked for traversal, not rewritten; `composer.json` and `composer.lock` are left alone. The whole client config tree is checked read-only under the PHP-FPM identity; unrelated unreadable settings are reported for explicit repair.
+- **New client creation:** The newly generated temporary scaffold is group-restricted; the shared helper then prepares its `config/` tree, including setgid inheritance, and checks actual PHP-FPM access before GitHub repository creation. It does not rewrite the scaffold's top-level Git checkout directory.
+- **Local client bootstrap:** The selected client's `config/` subtree (not the Git checkout root) is normalized file-by-file to directories `2750` and files `0640`. Root and selected-client `.env` files are normalized to developer-owned, PHP-FPM-group-readable `0640` **before** environment-helper writes; group/mode are reapplied after each atomic environment update. The script also verifies the actual web-user boot.
+
+The checks report the specific unreadable file or untraversable directory. This catches permission problems *before* Laravel's early error handler can mask the original issue as `Target class [config] does not exist`. These checks do not replace deployment preflight or detect every possible application configuration error; the staging/production deployment launcher remains authoritative for deployed runtime permissions.
+
+Local diagnostics after package installation:
+
+```bash
+./scripts/package.sh verify holly-hatcher-ef-core
+sudo -u www-data php artisan about --only=environment --no-ansi
+sudo -u www-data php artisan config:show client.dashboard --no-ansi
+```
+
+To explicitly repair previously generated package-managed paths **without** a Composer update or database installation, run:
+
+```bash
+python3 scripts/operations/lib/client_file_permissions.py prepare-managed \
+  client/holly-hatcher-ef-core
+```
+
+This does not rewrite client configuration values or touch the database.
 
 ## 3. Package metadata and credentials
 
