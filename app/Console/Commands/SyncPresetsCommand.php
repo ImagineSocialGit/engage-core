@@ -18,6 +18,7 @@ use App\Support\Presets\Enums\PresetDomain;
 use App\Support\Presets\PresetCompositionResolver;
 use App\Support\Presets\PresetPackageResolver;
 use Illuminate\Console\Command;
+use Illuminate\Contracts\Container\Container;
 use Throwable;
 
 class SyncPresetsCommand extends Command
@@ -33,20 +34,14 @@ class SyncPresetsCommand extends Command
 
     protected $description = 'Sync preset-owned database definitions in dependency-safe order. Campaign sync intentionally preserves customized records and has no force mode.';
 
+    // Resolve module actions only after their module and preset gates pass.
+    // Eager method injection would bootstrap disabled feature services, whose
+    // providers are intentionally absent in minimal selected-client runtimes.
     public function handle(
-        SyncContactStatusPresetsAction $syncContactStatusPresets,
-        SyncTaskPresetsAction $syncTaskPresets,
-        SyncDocumentRequirementDefinitionsAction $syncDocumentRequirements,
-        SyncWebinarScheduleProfilesAction $syncWebinarScheduleProfiles,
-        SyncMessageTemplatePresetsAction $syncMessageTemplatePresets,
-        SyncInboundReplyProfilesAction $syncInboundReplyProfiles,
-        SyncCampaignPresetsAction $syncCampaignPresets,
-        SyncFlowRouteCapabilitiesAction $syncFlowRouteCapabilities,
-        SyncFlowRoutePresetsAction $syncFlowRoutePresets,
-        SyncFormPresetsAction $syncFormPresets,
         PresetCompositionResolver $compositionResolver,
         PresetPackageResolver $packageResolver,
         ModuleManager $moduleManager,
+        Container $container,
     ): int {
         $argumentPreset = $this->argument('preset');
         $presetKey = $packageResolver->resolvePresetKey(
@@ -77,7 +72,7 @@ class SyncPresetsCommand extends Command
         try {
             if ($this->hasConfiguredGroups($packageResolver, $presetKey, PresetDomain::ContactStatuses)) {
                 $this->renderContactStatusResult(
-                    $syncContactStatusPresets->handle(
+                    $container->make(SyncContactStatusPresetsAction::class)->handle(
                         resolved: $compositionResolver->resolve($presetKey, PresetDomain::ContactStatuses),
                         force: (bool) $this->option('force-contact-statuses'),
                     ),
@@ -95,7 +90,7 @@ class SyncPresetsCommand extends Command
                 runtimeModules: $runtimeModules,
             )) {
                 $this->renderTaskResult(
-                    $syncTaskPresets->handle(
+                    $container->make(SyncTaskPresetsAction::class)->handle(
                         resolved: $compositionResolver->resolve($presetKey, PresetDomain::Tasks),
                         force: (bool) $this->option('force-tasks'),
                     ),
@@ -113,7 +108,7 @@ class SyncPresetsCommand extends Command
                 runtimeModules: $runtimeModules,
             )) {
                 $this->renderFormResult(
-                    $syncFormPresets->handle(
+                    $container->make(SyncFormPresetsAction::class)->handle(
                         $compositionResolver->resolve($presetKey, PresetDomain::Forms),
                     ),
                 );
@@ -124,7 +119,7 @@ class SyncPresetsCommand extends Command
 
             if (in_array('documents', $runtimeModules, true)) {
                 $this->renderDocumentRequirementResult(
-                    $syncDocumentRequirements->handle(),
+                    $container->make(SyncDocumentRequirementDefinitionsAction::class)->handle(),
                 );
             } else {
                 $this->line('');
@@ -133,7 +128,7 @@ class SyncPresetsCommand extends Command
 
             if (in_array('messaging', $runtimeModules, true)) {
                 $this->renderMessageTemplateResult(
-                    $syncMessageTemplatePresets->handle(
+                    $container->make(SyncMessageTemplatePresetsAction::class)->handle(
                         force: (bool) $this->option('force-message-templates'),
                     ),
                 );
@@ -144,7 +139,7 @@ class SyncPresetsCommand extends Command
 
             if (in_array('inbound_messaging', $runtimeModules, true)) {
                 $this->renderInboundReplyProfileResult(
-                    $syncInboundReplyProfiles->handle(
+                    $container->make(SyncInboundReplyProfilesAction::class)->handle(
                         force: (bool) $this->option('force-reply-profiles'),
                     ),
                 );
@@ -155,7 +150,7 @@ class SyncPresetsCommand extends Command
 
             if (in_array('webinars', $runtimeModules, true)) {
                 $this->renderWebinarScheduleProfileResult(
-                    $syncWebinarScheduleProfiles->handle(
+                    $container->make(SyncWebinarScheduleProfilesAction::class)->handle(
                         force: (bool) $this->option('force-webinar-schedule-profiles'),
                         requireMessageChains: true,
                     ),
@@ -173,7 +168,7 @@ class SyncPresetsCommand extends Command
                 runtimeModules: $runtimeModules,
             )) {
                 $this->renderCampaignResult(
-                    $syncCampaignPresets->handle(
+                    $container->make(SyncCampaignPresetsAction::class)->handle(
                         $compositionResolver->resolve($presetKey, PresetDomain::Campaigns),
                     ),
                 );
@@ -184,7 +179,7 @@ class SyncPresetsCommand extends Command
 
             if (in_array('flow_routes', $runtimeModules, true)) {
                 $this->renderFlowRouteCapabilityResult(
-                    $syncFlowRouteCapabilities->handle(),
+                    $container->make(SyncFlowRouteCapabilitiesAction::class)->handle(),
                 );
             } else {
                 $this->line('');
@@ -199,7 +194,7 @@ class SyncPresetsCommand extends Command
                 runtimeModules: $runtimeModules,
             )) {
                 $this->renderFlowRouteResult(
-                    $syncFlowRoutePresets->handle(
+                    $container->make(SyncFlowRoutePresetsAction::class)->handle(
                         resolved: $compositionResolver->resolve($presetKey, PresetDomain::FlowRoutes),
                         force: (bool) $this->option('force-flow-routes'),
                     ),
