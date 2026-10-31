@@ -242,10 +242,22 @@ final class ClientPackageManifestLoader
                     'requires_provider',
                     'preset_contributors',
                     'message_template_definition_contributors',
+                    'showcase_seeder',
                     'providers',
                 ],
                 context: "Selected client package module [{$moduleKey}]",
             );
+
+            // Development-only metadata is inert during normal runtime bootstrap.
+            // Verify the shape here; resolve the class only if a showcase seeder
+            // is explicitly invoked in local/testing.
+            if (array_key_exists('showcase_seeder', $definition)
+                && (! is_string($definition['showcase_seeder'])
+                    || trim($definition['showcase_seeder']) === '')) {
+                throw new RuntimeException(
+                    "Selected client package module [{$moduleKey}] showcase_seeder must be a non-empty class name.",
+                );
+            }
 
             $name = $definition['name'] ?? null;
 

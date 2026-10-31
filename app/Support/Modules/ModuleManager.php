@@ -2,6 +2,8 @@
 
 namespace App\Support\Modules;
 
+use App\Models\User;
+use App\Modules\Core\Access\Services\UserAccessService;
 use App\Support\Clients\ClientPackageRuntime;
 use Illuminate\Support\Arr;
 use InvalidArgumentException;
@@ -200,6 +202,20 @@ class ModuleManager
 
                 if (! is_string($route) || $route === '' || ! Route::has($route)) {
                     continue;
+                }
+
+                // Some workspaces carry restricted records (financial, personnel, etc.).
+                // The permission is a generic navigation contract; the route itself
+                // must still enforce authorization independently.
+                if (array_key_exists('capability', $item)) {
+                    $capability = $item['capability'];
+                    $user = auth()->user();
+
+                    if (! is_string($capability) || trim($capability) === ''
+                        || ! ($user instanceof User)
+                        || ! app(UserAccessService::class)->allows($user, $capability)) {
+                        continue;
+                    }
                 }
 
                 $label = $this->navigationLabel($item, $definition, $moduleKey);
