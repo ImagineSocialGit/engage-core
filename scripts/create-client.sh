@@ -56,7 +56,7 @@ Examples:
     --preset artist \
     --starter-package audience
 
-  ./scripts/create-client.sh thompson-square-engage America/Chicago \
+  ./scripts/create-client.sh thompson-square-core America/Chicago \
     --name "Thompson Square" \
     --preset artist \
     --starter-package full
