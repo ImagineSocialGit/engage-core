@@ -8,8 +8,10 @@ use App\Modules\Forms\ConfigContracts\FormDefinitionConfigContract;
 use App\Modules\Forms\ConfigContracts\FormDefinitionConfigContractTargetProvider;
 use App\Modules\Forms\Console\Commands\IssueExternalFormIntakeSecretCommand;
 use App\Modules\Forms\Deployment\FormsDeploymentPlanContributor;
+use App\Modules\Forms\HumanVerification\FormsPublicHumanVerificationSurface;
 use App\Modules\Forms\Services\HostedFormContextRegistry;
 use App\Modules\Forms\Validation\FormsSetupValidationContributor;
+use App\Support\HumanVerification\Contracts\RequiredPublicHumanVerificationSurface;
 use Illuminate\Support\ServiceProvider;
 
 class FormsModuleServiceProvider extends ServiceProvider
@@ -21,6 +23,13 @@ class FormsModuleServiceProvider extends ServiceProvider
             fn ($app): HostedFormContextRegistry => new HostedFormContextRegistry(
                 $app->tagged(HostedFormContextResolver::TAG),
             ),
+        );
+
+        // Only the Forms module declares its mandatory browser-facing boundary.
+        // Signed, authenticated machine-to-machine intake remains distinct.
+        $this->app->tag(
+            [FormsPublicHumanVerificationSurface::class],
+            RequiredPublicHumanVerificationSurface::TAG,
         );
 
         $this->app->tag([

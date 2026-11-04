@@ -3,6 +3,7 @@
 namespace App\Support\HumanVerification;
 
 use App\Support\HumanVerification\Contracts\HumanVerificationProvider;
+use App\Support\HumanVerification\Contracts\RequiredPublicHumanVerificationSurface;
 use App\Support\HumanVerification\Data\HumanVerificationRequest;
 use App\Support\HumanVerification\Data\HumanVerificationResult;
 use App\Support\HumanVerification\Data\HumanVerificationWidget;
@@ -16,26 +17,20 @@ final class HumanVerificationManager
     private const SURFACE_PATTERN = '/^[a-z0-9][a-z0-9_-]{0,63}$/D';
     private const ACTION_PATTERN = '/^[A-Za-z0-9][A-Za-z0-9_-]{0,31}$/D';
 
-    /**
-     * Browser-facing surfaces which cannot be disabled in deployed environments.
-     * Machine-authenticated Forms intake does not use this middleware.
-     *
-     * @var list<string>
-     */
-    private const DEPLOYED_REQUIRED_SURFACES = ['forms'];
-
     public function __construct(
         private readonly Container $container,
     ) {}
 
     public function enabledForSurface(string $surface): bool
     {
-        if ($this->requiresDeployedProtection($surface)) {
+        $declared = array_key_exists($surface, $this->requiredSurfaces());
+
+        if ($declared && $this->isDeployed()) {
             return true;
         }
 
         return (bool) config('human_verification.enabled', false)
-            && (bool) config("human_verification.surfaces.{$surface}.enabled", false);
+            && (bool) config("human_verification.surfaces.{$surface}.enabled", $declared);
     }
 
     public function responseField(): string
@@ -55,8 +50,9 @@ final class HumanVerificationManager
 
     public function validateConfiguration(): void
     {
-        if (! (bool) config('human_verification.enabled', false)
-            && ! $this->hasEnabledDeployedRequiredSurface()) {
+        $required = $this->isDeployed() ? $this->requiredSurfaces() : [];
+
+        if (! (bool) config('human_verification.enabled', false) && $required === []) {
             return;
         }
 
@@ -78,18 +74,15 @@ final class HumanVerificationManager
                 );
             }
 
-            if (! $this->enabledForSurface($surface)) {
-                continue;
-            }
-
-            $this->actionForSurface($surface);
-        }
-
-        foreach (self::DEPLOYED_REQUIRED_SURFACES as $surface) {
-            if ($this->requiresDeployedProtection($surface)
-                && in_array($surface, $this->enabledModuleKeys(), true)) {
+            if ($this->enabledForSurface($surface)) {
                 $this->actionForSurface($surface);
             }
+        }
+
+        // Mandatory surfaces are contributed by their owning enabled modules.
+        // No provider toggle may silently disable a declared deployed boundary.
+        foreach (array_keys($required) as $surface) {
+            $this->actionForSurface($surface);
         }
 
         [$provider, $configuration] = $this->resolvedProvider();
@@ -153,33 +146,51 @@ final class HumanVerificationManager
         }
     }
 
-    private function requiresDeployedProtection(string $surface): bool
+    private function isDeployed(): bool
     {
-        return ! app()->environment(['local', 'testing'])
-            && in_array($surface, self::DEPLOYED_REQUIRED_SURFACES, true);
+        return ! app()->environment(['local', 'testing']);
     }
 
-    private function hasEnabledDeployedRequiredSurface(): bool
+    /** @return array<string, string> Surface identifier => provider action. */
+    private function requiredSurfaces(): array
     {
-        if (app()->environment(['local', 'testing'])) {
-            return false;
-        }
+        $surfaces = [];
+        $enabledModules = $this->container->make(ModuleManager::class)->enabledKeysWithDependencies();
 
-        $enabled = $this->enabledModuleKeys();
-
-        foreach (self::DEPLOYED_REQUIRED_SURFACES as $surface) {
-            if (in_array($surface, $enabled, true)) {
-                return true;
+        foreach ($this->container->tagged(RequiredPublicHumanVerificationSurface::TAG) as $contributor) {
+            if (! $contributor instanceof RequiredPublicHumanVerificationSurface) {
+                throw new HumanVerificationConfigurationException(
+                    'Public human-verification surface contributor must implement the required-surface contract.',
+                );
             }
+
+            // Packages may be installed but not enabled for this client.
+            // Their public-verification declarations must remain inert.
+            if (! in_array($contributor->moduleKey(), $enabledModules, true)) {
+                continue;
+            }
+
+            $surface = $contributor->surface();
+            $action = $contributor->action();
+
+            if (preg_match(self::SURFACE_PATTERN, $surface) !== 1
+                || preg_match(self::ACTION_PATTERN, $action) !== 1
+            ) {
+                throw new HumanVerificationConfigurationException(
+                    'A required public human-verification surface has an invalid identifier or action.',
+                );
+            }
+
+            if (array_key_exists($surface, $surfaces)) {
+                throw new HumanVerificationConfigurationException(
+                    "Public human-verification surface [{$surface}] is declared more than once.",
+                );
+            }
+
+            $surfaces[$surface] = $action;
         }
 
-        return false;
-    }
-
-    /** @return list<string> */
-    private function enabledModuleKeys(): array
-    {
-        return app(ModuleManager::class)->enabledKeysWithDependencies();
+        return $surfaces;
     }
 
     private function actionForSurface(string $surface): string
@@ -190,7 +201,7 @@ final class HumanVerificationManager
             );
         }
 
-        $action = trim((string) config(
+        $action = $this->requiredSurfaces()[$surface] ?? trim((string) config(
             "human_verification.surfaces.{$surface}.action",
             '',
         ));

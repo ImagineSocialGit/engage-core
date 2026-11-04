@@ -3,6 +3,7 @@
 namespace Tests\Feature\HumanVerification;
 
 use App\Modules\Core\Validation\PublicHumanVerificationSetupValidationContributor;
+use App\Modules\Forms\Providers\FormsModuleServiceProvider;
 use App\Support\HumanVerification\Data\HumanVerificationResult;
 use App\Support\HumanVerification\HumanVerificationManager;
 use Illuminate\Support\Facades\Http;
@@ -10,6 +11,15 @@ use Tests\TestCase;
 
 final class DeployedFormsHumanVerificationDefaultTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // The module bootstrap normally tags this contributor when Forms is
+        // selected. Explicitly load the module in this isolated test runtime.
+        $this->app->register(FormsModuleServiceProvider::class);
+    }
+
     protected function tearDown(): void
     {
         app()->detectEnvironment(fn (): string => 'testing');
