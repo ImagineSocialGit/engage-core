@@ -18,10 +18,8 @@ final class PublicHumanVerificationSetupValidationContributor implements SetupVa
 
     public function findings(): iterable
     {
-        if (! (bool) config('human_verification.enabled', false)) {
-            return;
-        }
-
+        // The manager also validates mandatory deployed Forms protection when
+        // the legacy global opt-in setting is false or absent.
         try {
             $this->verification->validateConfiguration();
         } catch (Throwable $exception) {
