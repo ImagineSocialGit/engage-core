@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Clients;
 
+use Illuminate\Filesystem\Filesystem;
 use Symfony\Component\Process\Process;
 use Tests\TestCase;
 
@@ -79,68 +80,81 @@ class BootstrapClientLocalScriptTest extends TestCase
 
     public function test_local_bootstrap_restricts_env_files_and_preserves_web_readability(): void
     {
-        $script = (string) file_get_contents(
-            base_path('scripts/bootstrap-client-local.sh'),
-        );
+        $this->withPermissionsFixture(function (string $directory): void {
+            $clientDirectory = $directory.'/client';
+            $this->assertTrue(mkdir($clientDirectory, 0750));
 
-        $this->assertStringContainsString(
-            'WEB_USER="${ENGAGE_CORE_WEB_USER:-www-data}"',
-            $script,
-        );
-        $this->assertStringContainsString(
-            'set_web_group "$ROOT_ENV"',
-            $script,
-        );
-        $this->assertStringContainsString(
-            'set_web_group "$CLIENT_ENV"',
-            $script,
-        );
-        $this->assertStringContainsString(
-            'chmod 0640 "$ROOT_ENV" "$CLIENT_ENV"',
-            $script,
-        );
-        $this->assertStringNotContainsString(
-            'chmod 0664 "$ROOT_ENV" "$CLIENT_ENV"',
-            $script,
-        );
-        $this->assertStringContainsString(
-            'sudo -u "$WEB_USER" test -r "$ROOT_ENV"',
-            $script,
-        );
-        $this->assertStringContainsString(
-            'sudo -u "$WEB_USER" test -r "$CLIENT_ENV"',
-            $script,
-        );
-        $this->assertStringContainsString(
-            'WEB_GROUP="${ENGAGE_CORE_WEB_GROUP:-www-data}"',
-            $script,
-        );
+            $rootEnv = $directory.'/.env';
+            $clientEnv = $clientDirectory.'/.env';
+            $rootContent = "APP_ENV=local\n";
+            $clientContent = "ROOT_DOMAIN=engagecore.test\n";
+
+            $this->assertNotFalse(file_put_contents($rootEnv, $rootContent));
+            $this->assertNotFalse(file_put_contents($clientEnv, $clientContent));
+            $this->assertTrue(chmod($rootEnv, 0664));
+            $this->assertTrue(chmod($clientEnv, 0664));
+
+            $this->runPermissionsHelper('prepare-env', $rootEnv, $clientEnv);
+
+            foreach ([$rootEnv => $rootContent, $clientEnv => $clientContent] as $file => $content) {
+                clearstatcache(true, $file);
+
+                $this->assertSame(0640, fileperms($file) & 0777);
+                $this->assertSame(posix_geteuid(), fileowner($file));
+                $this->assertSame(posix_getegid(), filegroup($file));
+                $this->assertSame($content, file_get_contents($file));
+            }
+        });
     }
 
     public function test_local_bootstrap_normalizes_selected_client_config_for_the_web_runtime(): void
     {
-        $script = (string) file_get_contents(
-            base_path('scripts/bootstrap-client-local.sh'),
-        );
+        $this->withPermissionsFixture(function (string $directory): void {
+            $clientDirectory = $directory.'/client';
+            $configDirectory = $clientDirectory.'/config';
+            $nestedDirectory = $configDirectory.'/nested';
 
-        $this->assertStringContainsString(
-            'apply_client_config_permissions()',
-            $script,
-        );
-        $this->assertStringContainsString(
-            'set_web_group_recursive "$config_dir"',
-            $script,
-        );
-        $this->assertStringContainsString(
-            'find "$config_dir" -type d -exec chmod 2750 {} +',
-            $script,
-        );
-        $this->assertStringContainsString(
-            'find "$config_dir" -type f -exec chmod 0640 {} +',
-            $script,
-        );
+            $this->assertTrue(mkdir($nestedDirectory, 0755, true));
+
+            $configFiles = [
+                $configDirectory.'/client.php',
+                $configDirectory.'/modules.php',
+                $nestedDirectory.'/settings.php',
+            ];
+
+            foreach ($configFiles as $file) {
+                $this->assertNotFalse(file_put_contents($file, "<?php return [];\n"));
+                $this->assertTrue(chmod($file, 0644));
+            }
+
+            $outsideConfig = $clientDirectory.'/unmanaged.txt';
+            $this->assertNotFalse(file_put_contents($outsideConfig, "untouched\n"));
+            $this->assertTrue(chmod($outsideConfig, 0664));
+
+            $this->runPermissionsHelper('prepare-config', $clientDirectory);
+
+            foreach ([$configDirectory, $nestedDirectory] as $directoryPath) {
+                clearstatcache(true, $directoryPath);
+
+                $this->assertSame(02750, fileperms($directoryPath) & 07777);
+                $this->assertSame(posix_geteuid(), fileowner($directoryPath));
+                $this->assertSame(posix_getegid(), filegroup($directoryPath));
+            }
+
+            foreach ($configFiles as $file) {
+                clearstatcache(true, $file);
+
+                $this->assertSame(0640, fileperms($file) & 0777);
+                $this->assertSame(posix_geteuid(), fileowner($file));
+                $this->assertSame(posix_getegid(), filegroup($file));
+                $this->assertSame("<?php return [];\n", file_get_contents($file));
+            }
+
+            clearstatcache(true, $outsideConfig);
+            $this->assertSame(0664, fileperms($outsideConfig) & 0777);
+            $this->assertSame("untouched\n", file_get_contents($outsideConfig));
+        });
     }
-
     public function test_local_bootstrap_requires_a_full_selected_client_boot_under_the_web_user_before_install(): void
     {
         $script = (string) file_get_contents(
@@ -398,5 +412,50 @@ class BootstrapClientLocalScriptTest extends TestCase
             './scripts/bootstrap-client-local.sh $CLIENT_KEY',
             $script,
         );
+    }
+
+    /**
+     * Exercise the real permission policy against disposable local paths only.
+     * No client selection, MySQL provisioning, or privileged bootstrap runs.
+     */
+    private function withPermissionsFixture(callable $callback): void
+    {
+        $directory = sys_get_temp_dir().'/engage-bootstrap-permissions-'.bin2hex(random_bytes(8));
+        $this->assertTrue(mkdir($directory, 0750));
+
+        try {
+            $callback($directory);
+        } finally {
+            (new Filesystem())->deleteDirectory($directory);
+        }
+    }
+
+    private function runPermissionsHelper(string $operation, string ...$paths): void
+    {
+        $user = posix_getpwuid(posix_geteuid());
+        $group = posix_getgrgid(posix_getegid());
+
+        $this->assertIsArray($user);
+        $this->assertIsArray($group);
+        $this->assertNotEmpty($user['name'] ?? null);
+        $this->assertNotEmpty($group['name'] ?? null);
+
+        // Using the test runner's own identity/group lets the policy be checked
+        // without sudo or access to the real machine's PHP-FPM account.
+        $process = new Process(
+            [
+                'python3',
+                base_path('scripts/operations/lib/client_file_permissions.py'),
+                $operation,
+                ...$paths,
+            ],
+            base_path(),
+            [
+                'ENGAGE_CORE_WEB_USER' => $user['name'],
+                'ENGAGE_CORE_WEB_GROUP' => $group['name'],
+            ],
+        );
+
+        $process->mustRun();
     }
 }
