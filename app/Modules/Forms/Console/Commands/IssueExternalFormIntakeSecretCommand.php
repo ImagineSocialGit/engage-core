@@ -36,6 +36,12 @@ final class IssueExternalFormIntakeSecretCommand extends Command
         $this->line("FORMS_EXTERNAL_INTAKE_CLIENT_ID={$clientId}");
         $this->line("FORMS_EXTERNAL_INTAKE_CLIENT_SECRET={$secret}");
         $this->newLine();
+        $this->line('Engage SEO (.env)');
+        $this->line("ENGAGE_SEO_CORE_FORMS_CLIENT_ID={$clientId}");
+        $this->line("ENGAGE_SEO_CORE_FORMS_SIGNING_SECRET={$secret}");
+
+        $this->newLine();
+
         $this->line('Engage Artist Sites (.env)');
         $this->line("ENGAGE_CORE_CLIENT_KEY={$clientId}");
         $this->line("ENGAGE_CORE_SIGNING_SECRET={$secret}");
