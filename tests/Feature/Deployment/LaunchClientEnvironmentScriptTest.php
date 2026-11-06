@@ -14,6 +14,9 @@ class LaunchClientEnvironmentScriptTest extends TestCase
     {
         foreach ([
             'scripts/operations/launch-client-environment.sh',
+            'scripts/operations/lib/launch_environment.sh',
+            'scripts/operations/lib/launch_runtime.sh',
+            'scripts/operations/lib/launch_verify.sh',
             'scripts/operations/lib/launch_application.sh',
             'scripts/operations/lib/launch_workflow.sh',
             'scripts/operations/lib/launch_audit.sh',
@@ -31,6 +34,44 @@ class LaunchClientEnvironmentScriptTest extends TestCase
         ]))->mustRun();
 
         $this->assertTrue(true);
+    }
+
+    public function test_environment_runtime_and_verification_are_isolated_and_import_only(): void
+    {
+        $launcher = (string) file_get_contents(
+            base_path('scripts/operations/launch-client-environment.sh'),
+        );
+        $environment = (string) file_get_contents(
+            base_path('scripts/operations/lib/launch_environment.sh'),
+        );
+        $runtime = (string) file_get_contents(
+            base_path('scripts/operations/lib/launch_runtime.sh'),
+        );
+        $verification = (string) file_get_contents(
+            base_path('scripts/operations/lib/launch_verify.sh'),
+        );
+
+        $this->assertStringContainsString('launch_environment.sh launch_runtime.sh launch_verify.sh', $launcher);
+        $this->assertStringNotContainsString('ensure_environment() {', $launcher);
+        $this->assertStringNotContainsString('ensure_runtime() {', $launcher);
+        $this->assertStringNotContainsString('verify_runtime() {', $launcher);
+        $this->assertStringContainsString('ensure_environment() {', $environment);
+        $this->assertStringContainsString('ensure_env_permissions() {', $environment);
+        $this->assertStringContainsString('ensure_runtime() {', $runtime);
+        $this->assertStringContainsString('install_supervisor_program() {', $runtime);
+        $this->assertStringContainsString('verify_runtime() {', $verification);
+
+        $command = 'set -euo pipefail; for file in "$@"; do source "$file"; done; '
+            .'declare -F ensure_environment ensure_env_permissions ensure_runtime verify_runtime >/dev/null';
+        $process = new Process([
+            'bash', '-c', $command, 'bash',
+            base_path('scripts/operations/lib/launch_environment.sh'),
+            base_path('scripts/operations/lib/launch_runtime.sh'),
+            base_path('scripts/operations/lib/launch_verify.sh'),
+        ]);
+        $process->mustRun();
+        $this->assertSame('', $process->getOutput());
+        $this->assertSame('', $process->getErrorOutput());
     }
 
     public function test_guided_fix_is_delegated_and_category_aliases_are_resolved_without_mutation(): void
