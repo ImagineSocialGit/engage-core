@@ -1,7 +1,15 @@
 <?php
 
+use App\Support\Deployment\RedisTransportConfiguration;
 use Illuminate\Support\Str;
 use Pdo\Mysql;
+
+$redisTransport = RedisTransportConfiguration::forEnvironment(
+    environment: (string) env('APP_ENV', 'local'),
+    requestedScheme: (string) env('REDIS_SCHEME', 'tcp'),
+    host: (string) env('REDIS_HOST', '127.0.0.1'),
+    caFile: env('REDIS_TLS_CA'),
+);
 
 return [
 
@@ -61,6 +69,7 @@ return [
             'engine' => null,
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 (PHP_VERSION_ID >= 80500 ? Mysql::ATTR_SSL_CA : PDO::MYSQL_ATTR_SSL_CA) => env('MYSQL_ATTR_SSL_CA'),
+                (PHP_VERSION_ID >= 80500 ? Mysql::ATTR_SSL_VERIFY_SERVER_CERT : PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT) => env('MYSQL_ATTR_SSL_CA') ? true : null,
             ]) : [],
         ],
 
@@ -81,6 +90,7 @@ return [
             'engine' => null,
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 (PHP_VERSION_ID >= 80500 ? Mysql::ATTR_SSL_CA : PDO::MYSQL_ATTR_SSL_CA) => env('MYSQL_ATTR_SSL_CA'),
+                (PHP_VERSION_ID >= 80500 ? Mysql::ATTR_SSL_VERIFY_SERVER_CERT : PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT) => env('MYSQL_ATTR_SSL_CA') ? true : null,
             ]) : [],
         ],
 
@@ -154,8 +164,9 @@ return [
         ],
 
         'default' => [
-            'url' => env('REDIS_URL'),
             'host' => env('REDIS_HOST', '127.0.0.1'),
+            'scheme' => $redisTransport['scheme'],
+            'context' => $redisTransport['context'],
             'username' => env('REDIS_USERNAME'),
             'password' => env('REDIS_PASSWORD'),
             'port' => env('REDIS_PORT', '6379'),
@@ -167,8 +178,9 @@ return [
         ],
 
         'cache' => [
-            'url' => env('REDIS_URL'),
             'host' => env('REDIS_HOST', '127.0.0.1'),
+            'scheme' => $redisTransport['scheme'],
+            'context' => $redisTransport['context'],
             'username' => env('REDIS_USERNAME'),
             'password' => env('REDIS_PASSWORD'),
             'port' => env('REDIS_PORT', '6379'),

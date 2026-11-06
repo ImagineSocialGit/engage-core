@@ -42,6 +42,50 @@ class CoreDeploymentPlanContributorTest extends TestCase
         }
     }
 
+    public function test_live_environments_require_ansible_provisioned_database_and_redis_transport(): void
+    {
+        foreach (['staging', 'production'] as $environment) {
+            app()->detectEnvironment(fn (): string => $environment);
+
+            $requirements = $this->requirements();
+
+            foreach ([
+                'DB_CONNECTION',
+                'DB_HOST',
+                'MYSQL_ATTR_SSL_CA',
+                'REDIS_CLIENT',
+                'REDIS_HOST',
+                'REDIS_USERNAME',
+                'REDIS_PASSWORD',
+                'REDIS_SCHEME',
+                'REDIS_TLS_CA',
+            ] as $key) {
+                $this->assertSame(
+                    EnvironmentRequirement::REQUIRED,
+                    $requirements[$key]->requirement,
+                );
+            }
+
+            $this->assertSame('mysql', $requirements['DB_CONNECTION']->expectedValue);
+            $this->assertSame('phpredis', $requirements['REDIS_CLIENT']->expectedValue);
+            $this->assertSame('tls', $requirements['REDIS_SCHEME']->expectedValue);
+            $this->assertArrayNotHasKey('REDIS_URL', $requirements);
+        }
+    }
+
+    public function test_local_infrastructure_transport_requirements_are_not_mandatory(): void
+    {
+        app()->detectEnvironment(fn (): string => 'local');
+
+        $requirements = $this->requirements();
+
+        foreach (['DB_HOST', 'REDIS_HOST', 'REDIS_USERNAME', 'REDIS_SCHEME'] as $key) {
+            $this->assertSame(EnvironmentRequirement::DEFAULTED, $requirements[$key]->requirement);
+        }
+
+        $this->assertSame(EnvironmentRequirement::OPTIONAL, $requirements['REDIS_TLS_CA']->requirement);
+    }
+
     public function test_core_identity_and_database_values_remain_required_in_local(): void
     {
         app()->detectEnvironment(fn (): string => 'local');

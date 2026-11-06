@@ -58,13 +58,10 @@ final class CoreDeploymentPlanContributor implements DeploymentPlanContributor, 
             'LOG_DEPRECATIONS_TRACE',
             'LOG_LEVEL',
             'LOG_DAILY_DAYS',
-            'DB_CONNECTION',
-            'DB_HOST',
             'DB_PORT',
             'DB_SOCKET',
             'DB_CHARSET',
             'DB_COLLATION',
-            'MYSQL_ATTR_SSL_CA',
             'CACHE_STORE',
             'CACHE_EXTERNAL_API_RESPONSE_SECONDS',
             'CACHE_IMAGE_MANIFEST_SECONDS',
@@ -79,14 +76,9 @@ final class CoreDeploymentPlanContributor implements DeploymentPlanContributor, 
             'QUEUE_FAILED_DRIVER',
             'CONTACT_INGESTION_QUEUE',
             'CONTACT_ENRICHMENT_QUEUE',
-            'REDIS_CLIENT',
-            'REDIS_HOST',
-            'REDIS_PASSWORD',
             'REDIS_PORT',
             'REDIS_DB',
             'REDIS_CACHE_DB',
-            'REDIS_URL',
-            'REDIS_USERNAME',
             'REDIS_MAX_RETRIES',
             'REDIS_BACKOFF_ALGORITHM',
             'REDIS_BACKOFF_BASE',
@@ -130,6 +122,38 @@ final class CoreDeploymentPlanContributor implements DeploymentPlanContributor, 
         }
 
         $liveRuntime = in_array(app()->environment(), ['staging', 'production'], true);
+
+        // Ansible provisions the server, database identity, Redis ACL and CA
+        // before Core's application-only deployment lifecycle begins.
+        foreach ([
+            'DB_CONNECTION' => ['Live Core uses the Ansible-provisioned MySQL database.', 'mysql'],
+            'DB_HOST' => ['Live Core requires its explicitly allocated remote MySQL host.', null],
+            'MYSQL_ATTR_SSL_CA' => ['The private MySQL server requires certificate-verified TLS.', null],
+            'REDIS_CLIENT' => ['Live Core uses PhpRedis for queues, cache, locks and Horizon.', 'phpredis'],
+            'REDIS_HOST' => ['Live Core requires its allocated remote Redis host.', null],
+            'REDIS_USERNAME' => ['Live Core must authenticate with its assigned Redis ACL user.', null],
+            'REDIS_PASSWORD' => ['Live Core must authenticate using its protected Redis credential.', null],
+            'REDIS_SCHEME' => ['Live Core requires TLS-only Redis transport.', 'tls'],
+            'REDIS_TLS_CA' => ['Live Core must trust the provisioned Redis certificate authority.', null],
+        ] as $key => [$reason, $expectedValue]) {
+            if ($liveRuntime) {
+                yield EnvironmentRequirement::required(
+                    $key,
+                    $reason,
+                    expectedValue: $expectedValue,
+                );
+            } elseif ($key === 'REDIS_TLS_CA') {
+                yield EnvironmentRequirement::optional(
+                    $key,
+                    'Local Redis may use TCP; configure a trusted CA when opting into TLS.',
+                );
+            } else {
+                yield EnvironmentRequirement::defaulted(
+                    $key,
+                    'Local development may use the standard machine defaults.',
+                );
+            }
+        }
 
         foreach ([
             'CACHE_PREFIX' => 'Client cache keys must be isolated when infrastructure is shared.',
