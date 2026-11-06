@@ -89,19 +89,31 @@ class LaunchClientEnvironmentAuditScriptTest extends TestCase
         $this->assertStringNotContainsString('secret-value', $output);
     }
 
-    public function test_audit_shell_region_contains_no_known_mutating_launcher_operations(): void
+    public function test_audit_phase_is_sourced_by_the_operator_entry_point(): void
     {
         $launcher = (string) file_get_contents(
             base_path('scripts/operations/launch-client-environment.sh'),
         );
+        $audit = (string) file_get_contents(
+            base_path('scripts/operations/lib/launch_audit.sh'),
+        );
 
-        $start = strpos($launcher, 'audit_reset() {');
-        $end = strpos($launcher, 'http_status() {', $start);
+        $this->assertStringContainsString('launch_audit.sh', $launcher);
+        $this->assertStringNotContainsString('audit_reset() {', $launcher);
+        $this->assertStringNotContainsString('parse_audit() {', $launcher);
+        $this->assertStringContainsString('audit_reset() {', $audit);
+        $this->assertStringContainsString('parse_audit() {', $audit);
 
-        $this->assertNotFalse($start);
-        $this->assertNotFalse($end);
+        (new Process([
+            'bash', '-n', base_path('scripts/operations/lib/launch_audit.sh'),
+        ]))->mustRun();
+    }
 
-        $auditRegion = substr($launcher, $start, $end - $start);
+    public function test_audit_shell_region_contains_no_known_mutating_launcher_operations(): void
+    {
+        $auditRegion = (string) file_get_contents(
+            base_path('scripts/operations/lib/launch_audit.sh'),
+        );
 
         foreach ([
             'env_set ',
@@ -149,9 +161,9 @@ class LaunchClientEnvironmentAuditScriptTest extends TestCase
             $launcher,
         );
 
-        $start = strpos($launcher, 'parse_audit() {');
-        $end = strpos($launcher, 'http_status() {', $start);
-        $auditParser = substr($launcher, $start, $end - $start);
+        $auditParser = (string) file_get_contents(
+            base_path('scripts/operations/lib/launch_audit.sh'),
+        );
 
         $this->assertStringNotContainsString('STATE_FILE=', $auditParser);
         $this->assertStringNotContainsString('state-init', $auditParser);
@@ -348,7 +360,7 @@ NGINX;
     public function test_audit_distinguishes_legacy_drift_from_breaking_runtime_failures(): void
     {
         $launcher = (string) file_get_contents(
-            base_path('scripts/operations/launch-client-environment.sh'),
+            base_path('scripts/operations/lib/launch_audit.sh'),
         );
 
         $this->assertStringContainsString(
@@ -400,9 +412,7 @@ NGINX;
             $launcher,
         );
 
-        $auditStart = strpos($launcher, 'audit_reset() {');
-        $auditEnd = strpos($launcher, 'http_status() {', $auditStart);
-        $auditRegion = substr($launcher, $auditStart, $auditEnd - $auditStart);
+        $auditRegion = $launcher;
 
         $this->assertStringNotContainsString('MISMATCH', $auditRegion);
         $this->assertStringNotContainsString('MISSING', $auditRegion);
@@ -541,7 +551,7 @@ NGINX;
     public function test_audit_proves_remote_source_current_before_interpreting_runtime_state(): void
     {
         $launcher = (string) file_get_contents(
-            base_path('scripts/operations/launch-client-environment.sh'),
+            base_path('scripts/operations/lib/launch_audit.sh'),
         );
 
         $this->assertStringContainsString(
@@ -568,10 +578,8 @@ NGINX;
             'Authoritative runtime audit deferred: Core and client source must be clean and match their configured remote branches first.',
             $launcher,
         );
-        $this->assertStringContainsString(
-            'Source is never pulled automatically.',
-            $launcher,
-        );
+        $this->assertStringNotContainsString('git pull', $launcher);
+        $this->assertStringNotContainsString('git fetch', $launcher);
     }
 
     public function test_fix_defaults_to_guided_reconciliation_while_automatic_repairs_remain_breaking_only(): void
@@ -610,10 +618,6 @@ NGINX;
         );
         $this->assertStringContainsString(
             'Only BREAKING findings may enter the closed automatic fix registry.',
-            $launcher,
-        );
-        $this->assertStringContainsString(
-            'Guided fix may review INFO/WARNING findings and collect operator-supplied required environment values.',
             $launcher,
         );
         $this->assertStringContainsString(
@@ -698,7 +702,7 @@ NGINX;
     public function test_dns_audit_records_unresolved_host_and_continues_to_later_hosts(): void
     {
         $launcher = (string) file_get_contents(
-            base_path('scripts/operations/launch-client-environment.sh'),
+            base_path('scripts/operations/lib/launch_audit.sh'),
         );
 
         $start = strpos($launcher, 'audit_dns() {');

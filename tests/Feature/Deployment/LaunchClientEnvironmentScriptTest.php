@@ -16,6 +16,7 @@ class LaunchClientEnvironmentScriptTest extends TestCase
             'scripts/operations/launch-client-environment.sh',
             'scripts/operations/lib/launch_application.sh',
             'scripts/operations/lib/launch_workflow.sh',
+            'scripts/operations/lib/launch_audit.sh',
         ] as $path) {
             (new Process(['bash', '-n', base_path($path)]))->mustRun();
         }
