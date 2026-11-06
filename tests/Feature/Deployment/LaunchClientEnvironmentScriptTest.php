@@ -38,6 +38,35 @@ class LaunchClientEnvironmentScriptTest extends TestCase
         $this->assertTrue(true);
     }
 
+    public function test_legacy_mutating_entry_points_fail_before_loading_state_or_host_configuration(): void
+    {
+        $launcher = base_path('scripts/operations/launch-client-environment.sh');
+
+        foreach (['new', 'resume', 'update', 'add-modules', 'verify', 'fix'] as $operation) {
+            $process = new Process(['bash', $launcher, $operation]);
+            $process->run();
+
+            $this->assertNotSame(0, $process->getExitCode());
+            $this->assertSame('', $process->getOutput());
+            $this->assertNotSame('', $process->getErrorOutput());
+        }
+    }
+
+    public function test_managed_instance_check_rejects_invalid_identity_without_mutating_host(): void
+    {
+        $process = new Process([
+            'bash', base_path('scripts/operations/launch-client-environment.sh'),
+            'managed-check', '--instance-id', '../unauthorized',
+        ]);
+        $process->run();
+
+        $this->assertNotSame(0, $process->getExitCode());
+        $result = json_decode($process->getOutput(), true, 512, JSON_THROW_ON_ERROR);
+        $this->assertFalse($result['ready']);
+        $this->assertNull($result['instance_root']);
+        $this->assertNotEmpty($result['issues']);
+    }
+
     public function test_source_checkout_and_host_web_operations_are_separate_import_only_phases(): void
     {
         $launcher = (string) file_get_contents(

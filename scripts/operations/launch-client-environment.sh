@@ -16,6 +16,11 @@ Usage:
   launch-client-environment.sh audit --environment ENV --client-key KEY --root-domain DOMAIN [options]
   launch-client-environment.sh fix --environment ENV --client-key KEY --root-domain DOMAIN [options]
   launch-client-environment.sh derive --environment ENV --client-repo URL --root-domain DOMAIN [--client-key KEY]
+  launch-client-environment.sh managed-check --instance-id ID
+
+Managed-check inspects an Ansible-created app allocation and PHP-FPM pool read-only.
+It does not provision source, certificates, credentials, databases, Nginx or services.
+The former host-mutating state-file workflows are disabled pending replacement.
 
 Audit/fix identity options:
   --environment staging|production
@@ -324,6 +329,15 @@ main() {
     local command="$1"
     shift
 
+    # The extracted pre-Ansible workflows still call sudo for local MySQL,
+    # Nginx/Certbot, Supervisor and cron. They are intentionally unreachable
+    # until replaced with the Ansible-managed application lifecycle.
+    case "$command" in
+        new|resume|update|add-modules|verify|fix)
+            fail "Legacy host-mutating deployment workflow [$command] is disabled. Use Ansible for host provisioning; the managed application lifecycle is not yet implemented. No changes made."
+            ;;
+    esac
+
     case "$command" in
         new)
             parse_new "$@"
@@ -365,6 +379,11 @@ main() {
             ;;
         fix)
             parse_fix "$@"
+            ;;
+        managed-check)
+            [[ $# -eq 2 && "$1" == "--instance-id" ]] \
+                || fail "managed-check requires exactly --instance-id ID."
+            python3 "$SCRIPT_DIR/lib/launch_managed_instance.py" --instance-id "$2"
             ;;
         derive)
             parse_derive "$@"
