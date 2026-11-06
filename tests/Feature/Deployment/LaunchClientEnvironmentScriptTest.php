@@ -17,6 +17,8 @@ class LaunchClientEnvironmentScriptTest extends TestCase
             'scripts/operations/lib/launch_application.sh',
             'scripts/operations/lib/launch_workflow.sh',
             'scripts/operations/lib/launch_audit.sh',
+            'scripts/operations/lib/launch_host_repair.sh',
+            'scripts/operations/lib/launch_fix.sh',
         ] as $path) {
             (new Process(['bash', '-n', base_path($path)]))->mustRun();
         }
@@ -29,6 +31,41 @@ class LaunchClientEnvironmentScriptTest extends TestCase
         ]))->mustRun();
 
         $this->assertTrue(true);
+    }
+
+    public function test_guided_fix_is_delegated_and_category_aliases_are_resolved_without_mutation(): void
+    {
+        $launcher = (string) file_get_contents(
+            base_path('scripts/operations/launch-client-environment.sh'),
+        );
+        $fix = (string) file_get_contents(
+            base_path('scripts/operations/lib/launch_fix.sh'),
+        );
+        $hostRepair = (string) file_get_contents(
+            base_path('scripts/operations/lib/launch_host_repair.sh'),
+        );
+
+        $this->assertStringContainsString('launch_host_repair.sh launch_fix.sh', $launcher);
+        $this->assertStringNotContainsString('parse_fix() {', $launcher);
+        $this->assertStringNotContainsString('fix_apply_nginx_host() {', $launcher);
+        $this->assertStringContainsString('parse_fix() {', $fix);
+        $this->assertStringContainsString('run_fix() {', $fix);
+        $this->assertStringContainsString('fix_apply_nginx_host() {', $hostRepair);
+
+        $command = 'source "$1"; normalize_fix_categories "tls,cron,providers,schema,tls"';
+        $process = new Process([
+            'bash', '-c', $command, 'bash', base_path('scripts/operations/lib/launch_fix.sh'),
+        ]);
+        $process->mustRun();
+
+        $this->assertSame("nginx,scheduler,environment,schema\n", $process->getOutput());
+
+        $invalid = new Process([
+            'bash', '-c', 'source "$1"; normalize_fix_categories "unknown"',
+            'bash', base_path('scripts/operations/lib/launch_fix.sh'),
+        ]);
+        $invalid->run();
+        $this->assertNotSame(0, $invalid->getExitCode());
     }
 
     public function test_production_identity_is_derived_from_client_repo_and_root_domain(): void

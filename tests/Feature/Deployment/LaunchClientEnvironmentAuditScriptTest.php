@@ -587,6 +587,12 @@ NGINX;
         $launcher = (string) file_get_contents(
             base_path('scripts/operations/launch-client-environment.sh'),
         );
+        $fix = (string) file_get_contents(
+            base_path('scripts/operations/lib/launch_fix.sh'),
+        );
+        $hostRepair = (string) file_get_contents(
+            base_path('scripts/operations/lib/launch_host_repair.sh'),
+        );
 
         $this->assertStringContainsString(
             'launch-client-environment.sh fix --environment ENV --client-key KEY --root-domain DOMAIN [options]',
@@ -598,7 +604,7 @@ NGINX;
         );
         $this->assertStringContainsString(
             'local mode="interactive"',
-            $launcher,
+            $fix,
         );
         $this->assertStringContainsString(
             '--interactive                     Guided reconciliation (default)',
@@ -614,7 +620,7 @@ NGINX;
         );
         $this->assertStringContainsString(
             'environment,schema,runtime,nginx,horizon,scheduler',
-            $launcher,
+            $fix,
         );
         $this->assertStringContainsString(
             'Only BREAKING findings may enter the closed automatic fix registry.',
@@ -622,43 +628,43 @@ NGINX;
         );
         $this->assertStringContainsString(
             'fix_review_nonbreaking_findings',
-            $launcher,
+            $fix,
         );
         $this->assertStringContainsString(
             'fix_interactive_environment_reconciliation',
-            $launcher,
+            $fix,
         );
         $this->assertStringContainsString(
             'resolve-requirements',
-            $launcher,
+            $fix,
         );
         $this->assertStringContainsString(
             'Secret input is hidden. Values are written only after you supply or approve them.',
-            $launcher,
+            $fix,
         );
         $this->assertStringContainsString(
             'fix_confirm_mutation_once',
-            $launcher,
+            $fix,
         );
         $this->assertStringContainsString(
             '== Mandatory post-fix audit ==',
-            $launcher,
+            $fix,
         );
         $this->assertStringContainsString(
             'modules:install "$module" --force',
-            $launcher,
+            $fix,
         );
         $this->assertStringContainsString(
             'supplemental Core host',
-            $launcher,
+            $hostRepair,
         );
         $this->assertStringContainsString(
             'Deferred Horizon repair: deployment plan/setup validation or effective runtime-directory access is not green yet.',
-            $launcher,
+            $fix,
         );
         $this->assertStringContainsString(
             'Deferred Scheduler repair: deployment plan/setup validation or effective runtime-directory access is not green yet.',
-            $launcher,
+            $fix,
         );
     }
 
@@ -667,22 +673,25 @@ NGINX;
         $launcher = (string) file_get_contents(
             base_path('scripts/operations/launch-client-environment.sh'),
         );
+        $fix = (string) file_get_contents(
+            base_path('scripts/operations/lib/launch_fix.sh'),
+        );
 
         $this->assertStringContainsString(
             'Environment values changed. Clearing cached application configuration and re-auditing before any runtime repair.',
-            $launcher,
+            $fix,
         );
         $this->assertStringContainsString(
             '"$PHP_BIN" artisan optimize:clear',
-            $launcher,
+            $fix,
         );
         $this->assertStringContainsString(
             'run_audit || true',
-            $launcher,
+            $fix,
         );
         $this->assertStringContainsString(
             'if [[ "$FIX_MODE" == "interactive" ]]; then',
-            $launcher,
+            $fix,
         );
         $this->assertStringContainsString(
             'Provider secrets/credentials are never invented or collected in this mode.',
@@ -690,11 +699,11 @@ NGINX;
         );
         $this->assertStringContainsString(
             'FIX_CATEGORIES="schema,runtime,nginx,horizon,scheduler"',
-            $launcher,
+            $fix,
         );
         $this->assertStringContainsString(
             'Use Ctrl+C to stop safely if you need to leave and retrieve a provider value.',
-            $launcher,
+            $fix,
         );
     }
 
