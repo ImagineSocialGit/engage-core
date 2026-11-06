@@ -12,11 +12,13 @@ class LaunchClientEnvironmentScriptTest extends TestCase
 {
     public function test_launcher_and_support_helper_are_syntactically_valid(): void
     {
-        (new Process([
-            'bash',
-            '-n',
-            base_path('scripts/operations/launch-client-environment.sh'),
-        ]))->mustRun();
+        foreach ([
+            'scripts/operations/launch-client-environment.sh',
+            'scripts/operations/lib/launch_application.sh',
+            'scripts/operations/lib/launch_workflow.sh',
+        ] as $path) {
+            (new Process(['bash', '-n', base_path($path)]))->mustRun();
+        }
 
         (new Process([
             'python3',
@@ -84,25 +86,36 @@ class LaunchClientEnvironmentScriptTest extends TestCase
         $this->assertSame($first['database_user'], $second['database_user']);
     }
 
-    public function test_launcher_consumes_application_plan_instead_of_an_operator_queue_list(): void
+    public function test_launcher_delegates_application_operations_to_the_applicable_phases(): void
     {
         $launcher = (string) file_get_contents(
             base_path('scripts/operations/launch-client-environment.sh'),
         );
+        $application = (string) file_get_contents(
+            base_path('scripts/operations/lib/launch_application.sh'),
+        );
+        $workflow = (string) file_get_contents(
+            base_path('scripts/operations/lib/launch_workflow.sh'),
+        );
 
-        $this->assertStringContainsString('engage:deployment-plan --json', $launcher);
-        $this->assertStringContainsString('run-setup-steps', $launcher);
-        $this->assertStringContainsString('modules:install', $launcher);
-        $this->assertStringContainsString('modules:preflight', $launcher);
-        $this->assertStringNotContainsString('HORIZON_PRIMARY_QUEUES', $launcher);
+        $this->assertStringContainsString('launch_application.sh launch_workflow.sh', $launcher);
+        $this->assertStringNotContainsString('install_added_modules() {', $launcher);
+        $this->assertStringNotContainsString('run_new_or_resume() {', $launcher);
+        $this->assertStringContainsString('engage:deployment-plan --json', $application);
+        $this->assertStringContainsString('run-setup-steps', $application);
+        $this->assertStringContainsString('modules:install', $application);
+        $this->assertStringContainsString('modules:preflight', $application);
+        $this->assertStringNotContainsString('HORIZON_PRIMARY_QUEUES', $application);
+        $this->assertStringContainsString('resolve_deployment_plan', $workflow);
+        $this->assertStringContainsString('install_added_modules', $workflow);
 
-        $updateStart = strpos($launcher, 'update_application() {');
-        $updateEnd = strpos($launcher, 'install_added_modules() {', $updateStart);
+        $updateStart = strpos($application, 'update_application() {');
+        $updateEnd = strpos($application, 'install_added_modules() {', $updateStart);
 
         $this->assertNotFalse($updateStart);
         $this->assertNotFalse($updateEnd);
 
-        $update = substr($launcher, $updateStart, $updateEnd - $updateStart);
+        $update = substr($application, $updateStart, $updateEnd - $updateStart);
         $platformMigrationPosition = strpos($update, 'artisan migrate --force');
         $preflightPosition = strpos($update, 'artisan modules:preflight');
         $moduleMigrationPosition = strpos($update, 'artisan modules:migrate --force');
@@ -112,6 +125,21 @@ class LaunchClientEnvironmentScriptTest extends TestCase
         $this->assertNotFalse($moduleMigrationPosition);
         $this->assertLessThan($preflightPosition, $platformMigrationPosition);
         $this->assertLessThan($moduleMigrationPosition, $preflightPosition);
+    }
+
+    public function test_selected_module_installation_is_gated_by_the_application_plan(): void
+    {
+        $application = (string) file_get_contents(
+            base_path('scripts/operations/lib/launch_application.sh'),
+        );
+
+        $start = strpos($application, 'install_added_modules() {');
+        $this->assertNotFalse($start);
+        $install = substr($application, $start);
+
+        $this->assertStringContainsString('module_enabled "$module"', $install);
+        $this->assertStringContainsString('modules:install "$module" --force', $install);
+        $this->assertStringNotContainsString('case "$module"', $install);
     }
 
     public function test_machine_requirement_json_exposes_non_secret_expected_value(): void
