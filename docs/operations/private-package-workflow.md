@@ -179,3 +179,56 @@ Server deployment must use the selected client's **committed Composer lockfile**
 - **Local link failed:** the Composer installation and client manifest remain installed. Fix the link preflight and retry `package.sh link`; do not rerun GitHub creation. A link failure during `php artisan view:clear` can leave the symlink **already established**; inspect with `readlink -f` before attempting a relink.
 - **New vertical scaffold fails Artisan startup with `contains no migration files`:** this was caused by the early package workflow registering an empty scope. Update the existing scaffold descriptor/class to `"migration_scope": false` and a module definition without `migrationScope()`, then run `package.sh install CLIENT_KEY /absolute/path/to/package --sync-metadata --link` using the corrected package workflow. This regenerates the managed manifest without fake migrations or Composer reinstall, even when the local link already exists. Do not edit the generated `client_packages.php` by hand.
 - **Wrong client or environment:** switch root `CLIENT_KEY` explicitly and recheck actual selected database before changing a client.
+## 8. Cross-platform scaffolding (development only)
+
+The **same Core-owned generator** also scaffolds optional packages for Engage SEO and Engage Artist Sites. It does not install packages into another platform or operate any deployment infrastructure. This preserves the existing Core package manager and avoids competing generators.
+
+```bash
+cd /var/www/engage-core
+
+./scripts/package.sh create engage-seo-example --platform seo --type vertical \
+  --description 'Optional Engage SEO vertical' --dry-run
+
+./scripts/package.sh create engage-artist-example --platform artist --type vertical \
+  --description 'Optional Engage Artist Sites extension' --dry-run
+```
+
+Run the same command without `--dry-run` only after reviewing the scaffold plan; creation initializes a local repository and publishes a **private** GitHub repository. The default `--platform core` preserves the established Core workflow.
+
+| Platform | Vertical scaffold | Client installation |
+| --- | --- | --- |
+| Core | `*Package` module definition, module provider, empty migration directory | Existing `package.sh install` + module selection |
+| SEO | `Seo*ServiceProvider`, available vertical metadata, **no enabled features/routes by default** | Selected-client Composer and `config/client_packages.php` provider registration |
+| Artist Sites | `Artist*ServiceProvider` registration shell | Existing Artist Sites Composer/provider process; do not assume Core module semantics |
+
+Library packages receive no unnecessary feature provider. All new scaffolded packages include Composer `autoload-dev`, a generic PHPUnit test, and a package descriptor declaring the target platform. SEO/Artist site packages are **not accepted by Core's `package.sh install`**: that operation remains Core-specific. Installed packages must be explicitly enabled/registered through their actual host platform's existing client conventions.
+
+This generator does **not** create Stripe/provider credentials, deployment secrets, databases, schema, feature routes, business-specific implementations, or production provisioning scripts. Environment requirements and deployment provisioning remain owned by the corresponding platforms and infrastructure contracts.
+
+## 9. Standard package test runner
+
+Run package-owned PHPUnit tests under the target host's existing PHPUnit configuration without selecting any client or copying the package into an HHEF (or other client) vendor directory:
+
+```bash
+cd /var/www/engage-core
+
+./scripts/test-package.sh engage-seo-nonprofit
+./scripts/test-package.sh engage-donations --platform core
+./scripts/test-package.sh engage-seo-nonprofit --platform seo --test tests/Feature/SiteDonationsTransportTest.php
+./scripts/test-package.sh engage-seo-nonprofit -- --filter checkout
+./scripts/test-package.sh engage-seo-nonprofit --dry-run
+```
+
+- `--platform` is optional when a scaffold descriptor specifies the host or the legacy package name follows an established `engage-seo-*` / `engage-artist-*` convention. If uncertain, pass it explicitly.
+- Package source and test namespaces are registered from the **package's own** Composer `autoload`/`autoload-dev`, while the selected host provides Laravel, PHPunit and test bootstrap. It does not import client Composer autoloaders.
+- The host's testing environment remains authoritative: Core uses its dedicated MySQL test database; SEO isolates `CLIENT_KEY` and reads its own `.env.testing`; Artist Sites retains its existing PHPUnit setup. Never run these against a live client database.
+- Only `tests/` is run by default; optional `--test` selects a package-local path. Existing special suites (e.g. Event Signup's shared-QR integration tests) can continue to use their own explicit configurations until migrated intentionally.
+- The runner does **not** install missing vendor dependencies or enable optional modules. If a package requires unavailable provider libraries/migrations, use an appropriate generic test fixture or improve its host test contract, never a specific client dependency.
+- Python/JS test suites remain native to their language; this runner is for PHP/PHPUnit packages.
+
+Tooling regression tests (no database or remote calls):
+
+```bash
+cd /var/www/engage-core
+python3 -m unittest discover -s scripts/operations/tests -p 'test_package_*.py'
+```

@@ -85,35 +85,54 @@ def class_words(slug: str) -> str:
     return "".join(part.capitalize() for part in words(slug))
 
 
-def make_descriptor(slug: str, kind: str, owner: str) -> dict:
+def make_descriptor(slug: str, kind: str, owner: str, platform: str = "core") -> dict:
     if not NAME_PATTERN.fullmatch(slug):
         fail("Package repository name must be engage- followed by lowercase hyphenated words.")
-    if kind == "integration" and not slug.startswith("engage-integration-"):
-        fail("Integration packages must be named engage-integration-<provider>.")
-    if kind != "integration" and slug.startswith("engage-integration-"):
-        fail("engage-integration-* must be declared as type integration.")
+    integration_prefixes = {
+        "core": "engage-integration-",
+        "seo": "engage-seo-integration-",
+        "artist": "engage-artist-integration-",
+    }
+    if platform not in integration_prefixes:
+        fail("Package platform must be core, seo or artist.")
+    if kind == "integration" and not slug.startswith(integration_prefixes[platform]):
+        fail(f"{platform} integrations must be named {integration_prefixes[platform]}<provider>.")
+    if kind != "integration" and any(slug.startswith(prefix) for prefix in integration_prefixes.values()):
+        fail("Integration package names must be declared as type integration.")
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9-]*", owner):
         fail("Invalid GitHub owner name.")
+    if platform not in ("core", "seo", "artist"):
+        fail("Package platform must be core, seo or artist.")
+    if platform == "seo" and not slug.startswith("engage-seo-"):
+        fail("SEO package names must start with engage-seo-.")
+    if platform == "artist" and not slug.startswith("engage-artist-"):
+        fail("Artist package names must start with engage-artist-.")
     namespace = "ImagineSocial\\" + class_words(slug)
-    identifier = slug.removeprefix("engage-integration-") if kind == "integration" else slug.removeprefix("engage-")
+    identifier = slug.removeprefix(integration_prefixes[platform]) if kind == "integration" else slug.removeprefix("engage-")
     basename = class_words(identifier)
     descriptor = {
         "schema": 1,
         "name": PACKAGE_PREFIX + slug,
         "kind": kind,
+        "platform": platform,
         "namespace": namespace,
         "github_owner": owner,
         "environment": {},
     }
     if kind == "integration":
         descriptor["service_provider"] = namespace + "\\" + basename + "ServiceProvider"
-    elif kind == "vertical":
+    elif kind == "vertical" and platform == "core":
         module_key = identifier.replace("-", "_")
         descriptor["module_key"] = module_key
         descriptor["module_class"] = namespace + "\\" + basename + "Package"
         # A freshly scaffolded vertical has no schema yet. An explicit opt-in
         # is required once the package contributes real migration files.
         descriptor["migration_scope"] = False
+    elif kind == "vertical":
+        shortname = slug.removeprefix("engage-seo-").removeprefix("engage-artist-")
+        basename = ("Seo" if platform == "seo" else "Artist") + class_words(shortname)
+        descriptor["vertical_key"] = shortname.replace("-", "_")
+        descriptor["service_provider"] = namespace + "\\" + basename + "ServiceProvider"
     return descriptor
 
 
@@ -134,8 +153,10 @@ def package_contents(descriptor: dict, description: str) -> dict[str, str]:
         "license": "proprietary",
         "require": {"php": "^8.3"},
         "autoload": {"psr-4": {namespace + "\\": "src/"}},
+        "autoload-dev": {"psr-4": {namespace + "\\Tests\\": "tests/"}},
         "config": {"sort-packages": True},
     }
+    platform = descriptor.get("platform", "core")
     files: dict[str, str] = {
         "composer.json": pretty_json(composer),
         "engage-package.json": pretty_json(descriptor),
@@ -143,14 +164,18 @@ def package_contents(descriptor: dict, description: str) -> dict[str, str]:
         "README.md": (
             f"# {slug}\n\n{description}\n\n"
             f"Composer package: `{name}`. Type: `{kind}`.\n\n"
-            "The package is separate from the Engage Core repository and all client repositories.\n"
-            "Do not install Laravel or Illuminate in this package's runtime dependencies.\n\n"
-            "## Install for a selected local Core client\n\n"
-            "From the Engage Core checkout, with that client selected:\n\n"
-            "```bash\n"
-            f"./scripts/package.sh install CLIENT_KEY /var/www/{slug} --link\n"
-            "```\n\n"
-            "The client owns `composer.json`, `composer.lock`, and package manifest registration.\n"
+            "The package is separate from platform and client repositories.\n"
+            "Do not install a second Laravel runtime as a package dependency.\n\n"
+            f"## Host platform: {platform}\n\n"
+            + ("For Core, use `scripts/package.sh install CLIENT_KEY /var/www/" + slug
+               + " --link` from the Core checkout.\n\n" if platform == "core" else
+               "Use the existing selected-client Composer/package provider workflow on the host platform; "
+               "the Core-only `package.sh install` operation is not valid for this package.\n\n")
+            + "## Run tests (generic host; no selected client)\n\n"
+            + "```bash\n"
+            + f"cd /var/www/engage-core && ./scripts/test-package.sh {slug} --platform {platform}\n"
+            + "```\n\n"
+            "The selected client owns its Composer dependencies and package registration.\n"
             "The package owns its published code, metadata, and version history.\n"
             "Commit changes to each repository separately.\n\n"
             "`engage-package.json` declares package identity and registration metadata.\n"
@@ -168,7 +193,7 @@ def package_contents(descriptor: dict, description: str) -> dict[str, str]:
             "    }\n}\n",
             "use Illuminate\\Support\\ServiceProvider;\n\n",
         )
-    elif kind == "vertical":
+    elif kind == "vertical" and platform == "core":
         module_class = descriptor["module_class"].rsplit("\\", 1)[1]
         module_provider = module_class.removesuffix("Package") + "ModuleServiceProvider"
         module_key = descriptor["module_key"]
@@ -195,8 +220,73 @@ def package_contents(descriptor: dict, description: str) -> dict[str, str]:
             "use Illuminate\\Support\\ServiceProvider;\n\n",
         )
         files["database/migrations/.gitkeep"] = ""
+    elif kind == "vertical":
+        provider_class = descriptor["service_provider"].rsplit("\\", 1)[1]
+        key = descriptor["vertical_key"]
+        if platform == "seo":
+            files[f"src/{provider_class}.php"] = php_file(
+                namespace, provider_class,
+                f"final class {provider_class} extends ServiceProvider\n"
+                "{\n    public function register(): void\n    {\n"
+                "        // Register metadata only. Site features and routes remain opt-in.\n"
+                "        $vertical = [\n"
+                f"            'name' => {php_literal(class_words(key.replace('_', '-')))},\n"
+                "            'default_features' => [],\n"
+                "        ];\n"
+                f"        $existing = config('verticals.available.{key}');\n"
+                "        if ($existing !== null && $existing !== $vertical) {\n"
+                f"            throw new LogicException({php_literal('Conflicting SEO vertical registration: ' + key)});\n"
+                "        }\n"
+                f"        config()->set('verticals.available.{key}', $vertical);\n"
+                "    }\n}\n",
+                "use Illuminate\\Support\\ServiceProvider;\nuse LogicException;\n\n",
+            )
+        else:
+            files[f"src/{provider_class}.php"] = php_file(
+                namespace, provider_class,
+                f"final class {provider_class} extends ServiceProvider\n"
+                "{\n    public function register(): void\n    {\n"
+                "        // Register optional Artist Site capabilities when implemented.\n"
+                "    }\n}\n",
+                "use Illuminate\\Support\\ServiceProvider;\n\n",
+            )
     else:
         files["src/.gitkeep"] = ""
+
+    test_namespace = namespace + "\\Tests\\Unit"
+    if kind == "vertical" and platform == "core":
+        cls = descriptor["module_class"]
+        key = descriptor["module_key"]
+        test = php_file(
+            test_namespace, "PackageScaffoldTest",
+            "final class PackageScaffoldTest extends TestCase\n"
+            "{\n    public function test_module_definition_is_available_but_not_enabled_by_a_scaffold(): void\n    {\n"
+            f"        self::assertSame({php_literal(key)}, \\{cls}::MODULE_KEY);\n"
+            f"        self::assertContains('core', \\{cls}::moduleDefinition()['depends_on']);\n"
+            "    }\n}\n",
+            "use PHPUnit\\Framework\\TestCase;\n\n",
+        )
+    elif "service_provider" in descriptor:
+        cls = descriptor["service_provider"]
+        test = php_file(
+            test_namespace, "PackageScaffoldTest",
+            "final class PackageScaffoldTest extends TestCase\n"
+            "{\n    public function test_provider_class_is_loadable(): void\n    {\n"
+            f"        self::assertTrue(class_exists(\\{cls}::class));\n"
+            "    }\n}\n",
+            "use PHPUnit\\Framework\\TestCase;\n\n",
+        )
+    else:
+        test = php_file(
+            test_namespace, "PackageScaffoldTest",
+            "final class PackageScaffoldTest extends TestCase\n"
+            "{\n    public function test_composer_package_metadata_matches_checkout(): void\n    {\n"
+            "        $composer = json_decode(file_get_contents(dirname(__DIR__, 2).'/composer.json'), true, 512, JSON_THROW_ON_ERROR);\n"
+            f"        self::assertSame({php_literal(name)}, $composer['name']);\n"
+            "    }\n}\n",
+            "use PHPUnit\\Framework\\TestCase;\n\n",
+        )
+    files["tests/Unit/PackageScaffoldTest.php"] = test
     return files
 
 
@@ -207,7 +297,7 @@ def ensure_core() -> None:
 
 def create(args: argparse.Namespace) -> None:
     ensure_core()
-    descriptor = make_descriptor(args.name, args.type, args.owner)
+    descriptor = make_descriptor(args.name, args.type, args.owner, args.platform)
     parent = Path(args.parent).expanduser().resolve() if args.parent else ROOT.parent
     target = parent / args.name
     remote = f"{args.owner}/{args.name}"
@@ -216,11 +306,14 @@ def create(args: argparse.Namespace) -> None:
     print("Private package creation plan")
     print(f"  Package:    {descriptor['name']}")
     print(f"  Kind:       {args.type}")
+    print(f"  Platform:   {args.platform}")
     print(f"  Local:      {target}")
     print(f"  GitHub:     {remote} (private)")
     print(f"  Namespace:  {descriptor['namespace']}")
-    if args.type == "vertical":
+    if args.type == "vertical" and args.platform == "core":
         print(f"  Module:     {descriptor['module_key']} (not enabled automatically)")
+    elif args.type == "vertical":
+        print(f"  Provider:   {descriptor['service_provider']} (opt-in client registration)")
     if args.dry_run:
         print("Dry run: no files or remote created.")
         return
@@ -294,7 +387,11 @@ def create(args: argparse.Namespace) -> None:
             shutil.rmtree(work, ignore_errors=True)
         raise
     print(f"Created private package: {target}")
-    print(f"Next: ./scripts/package.sh install CLIENT_KEY {target} --link")
+    if args.platform == "core":
+        print(f"Next: ./scripts/package.sh install CLIENT_KEY {target} --link")
+    else:
+        print(f"Next: register {descriptor['name']} using the {args.platform} client Composer and provider conventions.")
+    print(f"Tests: ./scripts/test-package.sh {args.name} --platform {args.platform}")
 
 
 def validated_descriptor(source: Path) -> dict:
@@ -327,10 +424,19 @@ def validated_descriptor(source: Path) -> dict:
             fail(f"Invalid {field} class in package descriptor.")
     if kind == "integration" and not descriptor.get("service_provider"):
         fail("Integration packages must declare a service_provider.")
-    if kind == "vertical" and (not MODULE_PATTERN.fullmatch(str(descriptor.get("module_key", "")))
-                                or not descriptor.get("module_class")):
-        fail("Vertical package must declare module_key and module_class.")
-    if kind != "vertical" and ("module_key" in descriptor or "module_class" in descriptor):
+    platform = descriptor.get("platform", "core")
+    if platform not in ("core", "seo", "artist"):
+        fail("Unsupported package platform.")
+    if kind == "vertical" and platform == "core" and (
+            not MODULE_PATTERN.fullmatch(str(descriptor.get("module_key", "")))
+            or not descriptor.get("module_class")):
+        fail("Core vertical package must declare module_key and module_class.")
+    if kind == "vertical" and platform != "core" and (
+            descriptor.get("module_class") or not descriptor.get("service_provider")
+            or not MODULE_PATTERN.fullmatch(str(descriptor.get("vertical_key", "")))):
+        fail("Site vertical must declare vertical_key and a service provider, not a Core module.")
+    if kind != "vertical" and ("module_key" in descriptor or "module_class" in descriptor
+                               or "vertical_key" in descriptor):
         fail("Non-vertical packages cannot declare module contributions.")
     if "migration_scope" in descriptor:
         if kind != "vertical" or not isinstance(descriptor["migration_scope"], bool):
@@ -546,6 +652,8 @@ def install(args: argparse.Namespace) -> None:
     client = validate_client(args.client)
     source = Path(args.source).expanduser().resolve()
     descriptor = validated_descriptor(source)
+    if descriptor.get("platform", "core") != "core":
+        fail("Core package.sh install handles only Core packages; use the site's client Composer/provider workflow.")
     name = descriptor["name"]
     require_command("composer") if not args.dry_run else None
     require_command("git") if not args.dry_run else None
@@ -663,6 +771,7 @@ def main() -> int:
     make = commands.add_parser("create", help="Scaffold, commit, push a new private package")
     make.add_argument("name", help="Repository basename, e.g. engage-integration-stripe")
     make.add_argument("--type", required=True, choices=("integration", "vertical", "library"))
+    make.add_argument("--platform", choices=("core", "seo", "artist"), default="core")
     make.add_argument("--description", required=True)
     make.add_argument("--owner", default=os.getenv("ENGAGE_CORE_GITHUB_OWNER", DEFAULT_OWNER))
     make.add_argument("--parent", help="Parent checkout directory; defaults to Engage Core's sibling directory")
