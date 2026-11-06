@@ -14,6 +14,8 @@ class LaunchClientEnvironmentScriptTest extends TestCase
     {
         foreach ([
             'scripts/operations/launch-client-environment.sh',
+            'scripts/operations/lib/launch_source.sh',
+            'scripts/operations/lib/launch_host_web.sh',
             'scripts/operations/lib/launch_environment.sh',
             'scripts/operations/lib/launch_runtime.sh',
             'scripts/operations/lib/launch_verify.sh',
@@ -34,6 +36,43 @@ class LaunchClientEnvironmentScriptTest extends TestCase
         ]))->mustRun();
 
         $this->assertTrue(true);
+    }
+
+    public function test_source_checkout_and_host_web_operations_are_separate_import_only_phases(): void
+    {
+        $launcher = (string) file_get_contents(
+            base_path('scripts/operations/launch-client-environment.sh'),
+        );
+        $source = (string) file_get_contents(
+            base_path('scripts/operations/lib/launch_source.sh'),
+        );
+        $hostWeb = (string) file_get_contents(
+            base_path('scripts/operations/lib/launch_host_web.sh'),
+        );
+
+        $this->assertStringContainsString('launch_source.sh launch_host_web.sh', $launcher);
+        $this->assertStringNotContainsString('ensure_source() {', $launcher);
+        $this->assertStringNotContainsString('install_nginx_site() {', $launcher);
+        $this->assertStringNotContainsString('ensure_dns_and_tls() {', $launcher);
+        $this->assertStringContainsString('repo_must_be_clean() {', $source);
+        $this->assertStringContainsString('repo_pull_ff() {', $source);
+        $this->assertStringContainsString('ensure_source() {', $source);
+        $this->assertStringContainsString('core_hosts() {', $hostWeb);
+        $this->assertStringContainsString('install_nginx_site() {', $hostWeb);
+        $this->assertStringContainsString('ensure_dns_and_tls() {', $hostWeb);
+        $this->assertStringNotContainsString('install_nginx_site() {', $source);
+
+        // Import alone may neither fetch repositories nor change host services.
+        $command = 'set -euo pipefail; for file in "$@"; do source "$file"; done; '
+            .'declare -F repo_pull_ff ensure_source core_hosts install_nginx_site ensure_dns_and_tls >/dev/null';
+        $process = new Process([
+            'bash', '-c', $command, 'bash',
+            base_path('scripts/operations/lib/launch_source.sh'),
+            base_path('scripts/operations/lib/launch_host_web.sh'),
+        ]);
+        $process->mustRun();
+        $this->assertSame('', $process->getOutput());
+        $this->assertSame('', $process->getErrorOutput());
     }
 
     public function test_environment_runtime_and_verification_are_isolated_and_import_only(): void
