@@ -145,6 +145,15 @@ if [[ -z "$CLIENT_KEY" || -z "$CLIENT_TIMEZONE" ]]; then
   exit 1
 fi
 
+# Enforce the persisted Core environment before invoking GitHub, checking
+# external services, or constructing a temporary client source checkout.
+# Read-only previews remain available regardless of environment.
+if [[ "$DRY_RUN" != true ]]; then
+  ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+  python3 "$ROOT_DIR/scripts/operations/lib/creation_environment.py" \
+    "$ROOT_DIR" "Client creation"
+fi
+
 if [[ ! "$CLIENT_KEY" =~ ^[a-z0-9][a-z0-9_-]*$ ]]; then
   echo "Client key must start with a lowercase letter or number and contain only lowercase letters, numbers, hyphens, and underscores."
   exit 1

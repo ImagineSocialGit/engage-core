@@ -18,6 +18,21 @@ The scaffolder generates minimal valid source structure, not invented integratio
 
 ## 1. Create a private package
 
+Source creation is **development-only**. Before any non-preview package or Core
+client creation, the tooling requires exactly one active `APP_ENV=local`
+assignment in the **Engage Core root `.env`**. Missing, ambiguous, staging, or
+production values fail closed before Git/GitHub or scaffold changes. A process
+`APP_ENV=local` override cannot bypass a non-local persisted checkout environment.
+`--dry-run` remains a non-publishing preview. This restriction does not change
+package installation, verification, local links, or deployment procedures.
+
+The same rule applies to `scripts/create-client.sh`; Engage SEO's own client
+creator already checks its root local environment. New Artist Sites creation
+tooling must enforce the equivalent check when introduced. Creating a private
+GitHub repository **from the development workstation** remains part of the
+normal creation workflow. Staging and production receive committed sources via
+deployment, never a newly scaffolded local checkout.
+
 From the **development** Core checkout:
 
 ```bash

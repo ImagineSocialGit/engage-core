@@ -317,6 +317,15 @@ def create(args: argparse.Namespace) -> None:
     if args.dry_run:
         print("Dry run: no files or remote created.")
         return
+    # Verify the persisted Core root environment before any Git, GitHub,
+    # filesystem privilege escalation, or scaffold mutations take place.
+    guard = subprocess.run(
+        [sys.executable, str(Path(__file__).with_name("creation_environment.py")),
+         str(ROOT), "Package creation"],
+        text=True, capture_output=True,
+    )
+    if guard.returncode != 0:
+        fail(guard.stderr.strip() or "Package creation requires root APP_ENV=local.")
     for name in ("git", "gh", "php"):
         require_command(name)
     if not parent.is_dir():
