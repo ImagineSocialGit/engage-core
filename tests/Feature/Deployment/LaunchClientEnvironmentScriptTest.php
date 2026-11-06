@@ -67,6 +67,29 @@ class LaunchClientEnvironmentScriptTest extends TestCase
         $this->assertNotEmpty($result['issues']);
     }
 
+    public function test_managed_source_check_rejects_invalid_release_before_git_or_host_mutations(): void
+    {
+        $process = new Process([
+            'bash', base_path('scripts/operations/launch-client-environment.sh'),
+            'managed-source-check',
+            '--instance-id', 'example-core',
+            '--release-id', '../escape',
+            '--client-key', 'example_client',
+            '--core-repository', 'ImagineSocialGit/engage-core',
+            '--core-commit', str_repeat('a', 40),
+            '--client-repository', 'ImagineSocialGit/example-client',
+            '--client-commit', str_repeat('b', 40),
+        ]);
+        $process->run();
+
+        $this->assertNotSame(0, $process->getExitCode());
+        $result = json_decode($process->getOutput(), true, 512, JSON_THROW_ON_ERROR);
+        $this->assertFalse($result['ready']);
+        $this->assertNull($result['release_path']);
+        $this->assertNotEmpty($result['issues']);
+        $this->assertSame('', $process->getErrorOutput());
+    }
+
     public function test_source_checkout_and_host_web_operations_are_separate_import_only_phases(): void
     {
         $launcher = (string) file_get_contents(

@@ -17,9 +17,14 @@ Usage:
   launch-client-environment.sh fix --environment ENV --client-key KEY --root-domain DOMAIN [options]
   launch-client-environment.sh derive --environment ENV --client-repo URL --root-domain DOMAIN [--client-key KEY]
   launch-client-environment.sh managed-check --instance-id ID
+  launch-client-environment.sh managed-source-check --instance-id ID --release-id RELEASE \
+    --client-key KEY --core-repository OWNER/REPO --core-commit SHA \
+    --client-repository OWNER/REPO --client-commit SHA
 
 Managed-check inspects an Ansible-created app allocation and PHP-FPM pool read-only.
 It does not provision source, certificates, credentials, databases, Nginx or services.
+Managed-source-check verifies an already-prepared Core release and selected client
+against approved repository identities and exact commits. It never fetches or writes.
 The former host-mutating state-file workflows are disabled pending replacement.
 
 Audit/fix identity options:
@@ -384,6 +389,9 @@ main() {
             [[ $# -eq 2 && "$1" == "--instance-id" ]] \
                 || fail "managed-check requires exactly --instance-id ID."
             python3 "$SCRIPT_DIR/lib/launch_managed_instance.py" --instance-id "$2"
+            ;;
+        managed-source-check)
+            python3 "$SCRIPT_DIR/lib/launch_managed_source.py" "$@"
             ;;
         derive)
             parse_derive "$@"
