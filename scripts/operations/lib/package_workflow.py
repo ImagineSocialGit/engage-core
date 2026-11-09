@@ -774,6 +774,293 @@ def verify(args: argparse.Namespace) -> None:
         print("No managed private packages installed.")
 
 
+
+def audit_finding(findings: list[dict], severity: str, code: str, detail: str,
+                  package: str | None = None) -> None:
+    finding = {"severity": severity, "code": code, "detail": detail}
+    if package is not None:
+        finding["package"] = package
+    findings.append(finding)
+
+
+def audit_json(path: Path, findings: list[dict], code: str) -> dict | None:
+    """Inspect source metadata without executing PHP, Composer or shell commands."""
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, UnicodeError) as exc:
+        audit_finding(findings, "error", code, f"Invalid JSON at {path.name}: {exc}")
+        return None
+    if not isinstance(value, dict):
+        audit_finding(findings, "error", code, f"Expected JSON object at {path.name}.")
+        return None
+    return value
+
+
+def audit_client_package_lifecycle(client: Path, source_paths: list[Path] | None = None) -> dict:
+    """Read-only evidence report, never an application readiness assertion.
+
+    In particular, do not require/parse PHP client manifests, read .env,
+    call Composer, inspect running services, or generate a registry or lock.
+    """
+    findings: list[dict] = []
+    report: dict = {
+        "schema": 1,
+        "platform": "core",
+        "client": client.name,
+        "mode": "read_only",
+        "composer": {"state": "absent", "private_requirements": {}},
+        "lock": {"state": "absent", "locked_packages": {}},
+        "manifest": {"mode": "absent", "state": "absent", "registered_packages": []},
+        "sources": [],
+        "packages": [],
+        "findings": findings,
+        "not_verified": [
+            "Composer content-hash and dependency solver consistency",
+            "Composer-installed revision and autoload/class validity",
+            "PHP manifest semantics for hand-maintained manifests",
+            "Module/feature activation and migration state",
+            "Provider roles, credentials, external readiness and deployed runtime",
+        ],
+    }
+    composer_path = client / "composer.json"
+    requirements: dict[str, str] = {}
+    if composer_path.is_file():
+        composer = audit_json(composer_path, findings, "invalid_composer")
+        report["composer"]["state"] = "valid" if composer is not None else "invalid"
+        if composer is not None:
+            required = composer.get("require")
+            if not isinstance(required, dict):
+                audit_finding(findings, "error", "invalid_require", "Client Composer require must be an object.")
+                report["composer"]["state"] = "invalid"
+            else:
+                for name, constraint in required.items():
+                    if isinstance(name, str) and name.startswith(PACKAGE_PREFIX):
+                        if not isinstance(constraint, str) or not constraint.strip():
+                            audit_finding(findings, "error", "invalid_constraint",
+                                          "Private package constraint must be a nonempty string.", name)
+                        else:
+                            requirements[name] = constraint
+                if any(item["code"] == "invalid_constraint" for item in findings):
+                    report["composer"]["state"] = "invalid"
+                report["composer"]["private_requirements"] = dict(sorted(requirements.items()))
+    elif composer_path.exists():
+        report["composer"]["state"] = "invalid"
+        audit_finding(findings, "error", "invalid_composer", "Client composer.json is not a regular file.")
+
+    lock_path = client / "composer.lock"
+    locked: dict[str, dict] = {}
+    if lock_path.is_file():
+        lock = audit_json(lock_path, findings, "invalid_lock")
+        report["lock"]["state"] = "valid" if lock is not None else "invalid"
+        if lock is not None:
+            for section in ("packages", "packages-dev"):
+                records = lock.get(section, [])
+                if not isinstance(records, list):
+                    audit_finding(findings, "error", "invalid_lock_packages",
+                                  f"Composer lock {section} must be a list.")
+                    report["lock"]["state"] = "invalid"
+                    continue
+                for item in records:
+                    if not isinstance(item, dict) or not isinstance(item.get("name"), str):
+                        audit_finding(findings, "error", "invalid_lock_package",
+                                      f"Composer lock {section} has a package without a valid name.")
+                        report["lock"]["state"] = "invalid"
+                        continue
+                    name = item["name"]
+                    if not name.startswith(PACKAGE_PREFIX):
+                        continue
+                    if name in locked:
+                        audit_finding(findings, "error", "duplicate_lock_package",
+                                      "Private package appears more than once in Composer lock.", name)
+                        report["lock"]["state"] = "invalid"
+                        continue
+                    source = item.get("source")
+                    reference = source.get("reference") if isinstance(source, dict) else None
+                    locked[name] = {
+                        "version": item.get("version") if isinstance(item.get("version"), str) else None,
+                        "source_reference": reference if isinstance(reference, str) else None,
+                    }
+            report["lock"]["locked_packages"] = dict(sorted(locked.items()))
+    elif lock_path.exists():
+        report["lock"]["state"] = "invalid"
+        audit_finding(findings, "error", "invalid_lock", "Client composer.lock is not a regular file.")
+    if requirements and report["lock"]["state"] == "absent":
+        audit_finding(findings, "error", "missing_lock",
+                      "Selected private packages require a committed Composer lock.")
+    if report["lock"]["state"] == "valid":
+        for name in requirements:
+            if name not in locked:
+                audit_finding(findings, "error", "package_not_locked",
+                              "Selected private package is absent from Composer lock.", name)
+    if locked and report["composer"]["state"] == "absent":
+        audit_finding(findings, "error", "lock_without_composer",
+                      "Composer lock exists without client composer.json.")
+
+    registry_path = client / "config" / REGISTRY_NAME
+    manifest_path = client / "config" / "client_packages.php"
+    registry_entries: dict[str, dict] = {}
+    if registry_path.is_file():
+        report["manifest"]["mode"] = "managed"
+        registry = audit_json(registry_path, findings, "invalid_registry")
+        if registry is None:
+            report["manifest"]["state"] = "invalid"
+        else:
+            try:
+                entries = validate_registry(registry)
+                generated = manifest_php(registry)
+            except WorkflowError as exc:
+                audit_finding(findings, "error", "invalid_registry", str(exc))
+                report["manifest"]["state"] = "invalid"
+            else:
+                registry_entries = {entry["name"]: entry for entry in entries}
+                report["manifest"]["registered_packages"] = sorted(registry_entries)
+                if not manifest_path.is_file():
+                    report["manifest"]["state"] = "missing"
+                    audit_finding(findings, "error", "missing_managed_manifest",
+                                  "Managed registry exists but generated client_packages.php is missing.")
+                else:
+                    try:
+                        actual = manifest_path.read_text(encoding="utf-8")
+                    except (OSError, UnicodeError):
+                        actual = None
+                    if actual != generated:
+                        report["manifest"]["state"] = "drift"
+                        audit_finding(findings, "error", "managed_manifest_drift",
+                                      "Generated client_packages.php differs from the managed registry.")
+                    else:
+                        report["manifest"]["state"] = "matches"
+    elif registry_path.exists():
+        report["manifest"].update(mode="managed", state="invalid")
+        audit_finding(findings, "error", "invalid_registry", "Managed registry is not a regular file.")
+    elif manifest_path.is_file():
+        report["manifest"].update(mode="hand_maintained", state="not_evaluated")
+        try:
+            header = manifest_path.read_text(encoding="utf-8")[:300]
+        except (OSError, UnicodeError):
+            header = ""
+        if GENERATED_HEADER.strip() in header:
+            report["manifest"].update(mode="orphan_generated", state="invalid")
+            audit_finding(findings, "error", "missing_managed_registry",
+                          "Manifest has managed-generation marker but its registry is absent.")
+        else:
+            audit_finding(findings, "info", "hand_maintained_manifest",
+                          "Hand-maintained PHP manifest is present; its contents were not executed or inferred.")
+    elif manifest_path.exists():
+        report["manifest"].update(mode="invalid", state="invalid")
+        audit_finding(findings, "error", "invalid_manifest", "Client package manifest is not a regular file.")
+
+    if report["manifest"]["mode"] == "managed" and registry_entries:
+        for name in registry_entries:
+            if name not in requirements:
+                audit_finding(findings, "error", "registration_without_requirement",
+                              "Managed package registration has no selected-client Composer requirement.", name)
+        for name in requirements:
+            if name not in registry_entries:
+                audit_finding(findings, "warning", "requirement_without_registration",
+                              "Selected package is not in the managed registry; library-only packages may not need runtime registration.", name)
+    elif requirements and report["manifest"]["mode"] == "absent":
+        audit_finding(findings, "warning", "manifest_absent",
+                      "Selected private packages have no client package manifest; check whether they need runtime registration.")
+
+    vendor = client / "vendor"
+    autoload = vendor / "autoload.php"
+    report["client_autoload"] = "present" if autoload.is_file() else "absent"
+    for name in sorted(set(requirements) | set(registry_entries)):
+        package_path = vendor / name
+        if package_path.is_symlink():
+            vendor_state = "local_link"
+        elif package_path.is_dir():
+            vendor_state = "directory_present"
+        else:
+            vendor_state = "absent"
+        report["packages"].append({
+            "name": name,
+            "constraint": requirements.get(name),
+            "registered_in_managed_registry": name in registry_entries if report["manifest"]["mode"] == "managed" else None,
+            "lock": locked.get(name),
+            "vendor": vendor_state,
+        })
+    if requirements and report["client_autoload"] == "absent":
+        audit_finding(findings, "warning", "autoload_absent",
+                      "Client Composer autoload.php is absent; installed runtime cannot be verified from this checkout.")
+
+    for source_path in source_paths or []:
+        source = Path(source_path).expanduser().resolve()
+        source_report: dict = {"directory": str(source), "name": None, "descriptor": "not_checked"}
+        report["sources"].append(source_report)
+        if not source.is_dir():
+            source_report["descriptor"] = "source_missing"
+            audit_finding(findings, "error", "source_missing", f"Package source directory does not exist: {source}")
+            continue
+        source_composer_path = source / "composer.json"
+        source_composer = audit_json(source_composer_path, findings, "invalid_source_composer") if source_composer_path.is_file() else None
+        if source_composer is None:
+            source_report["descriptor"] = "unverifiable"
+            if not source_composer_path.is_file():
+                audit_finding(findings, "error", "source_composer_missing",
+                              f"Source has no composer.json: {source.name}")
+            continue
+        source_name = source_composer.get("name")
+        if not isinstance(source_name, str) or not source_name.startswith(PACKAGE_PREFIX):
+            source_report["descriptor"] = "unverifiable"
+            audit_finding(findings, "error", "source_name_invalid",
+                          f"Source Composer package name is not an Engage private package: {source.name}")
+            continue
+        source_report["name"] = source_name
+        source_report["selected_in_client"] = source_name in requirements
+        desc_path = source / "engage-package.json"
+        if not desc_path.is_file():
+            source_report["descriptor"] = "missing"
+            audit_finding(findings, "warning", "descriptor_missing",
+                          "Legacy source has no engage-package.json; descriptor metadata cannot be audited.", source_name)
+            continue
+        try:
+            descriptor = validated_descriptor(source)
+        except (WorkflowError, TypeError, AttributeError, KeyError, UnicodeError) as exc:
+            source_report["descriptor"] = "invalid"
+            audit_finding(findings, "error", "invalid_descriptor", str(exc), source_name)
+            continue
+        source_report["descriptor"] = "valid"
+        source_report["kind"] = descriptor["kind"]
+        source_report["platform"] = descriptor.get("platform", "core")
+        if descriptor.get("platform", "core") != "core":
+            audit_finding(findings, "warning", "foreign_platform_source",
+                          "Source is not a Core package; its host lifecycle is not assessed by Core's audit.", source_name)
+        registered = registry_entries.get(source_name)
+        if registered is not None and registered != descriptor:
+            audit_finding(findings, "warning", "descriptor_registry_drift",
+                          "Source descriptor differs from managed registry; review before metadata synchronization.", source_name)
+    return report
+
+
+def audit(args: argparse.Namespace) -> bool:
+    ensure_core()
+    if not CLIENT_PATTERN.fullmatch(args.client):
+        fail("Invalid client key.")
+    client = ROOT / "client" / args.client
+    if not (client / "config" / "client.php").is_file():
+        fail(f"Selected client does not exist: {client}")
+    report = audit_client_package_lifecycle(client, [Path(source) for source in args.source])
+    if args.json:
+        print(json.dumps(report, indent=2, ensure_ascii=False))
+    else:
+        print(f"Core selected-client package audit (read-only): {report['client']}")
+        print(f"  Composer:  {report['composer']['state']} ({len(report['composer']['private_requirements'])} private requirements)")
+        print(f"  Lock:      {report['lock']['state']} ({len(report['lock']['locked_packages'])} locked private packages)")
+        print(f"  Manifest:  {report['manifest']['mode']} / {report['manifest']['state']}")
+        print(f"  Autoload:  {report['client_autoload']}")
+        for package in report["packages"]:
+            locked = "locked" if package["lock"] is not None else "not locked"
+            print(f"  Package:   {package['name']} ({locked}; vendor: {package['vendor']})")
+        for source in report["sources"]:
+            print(f"  Source:    {source['directory']} ({source['descriptor']})")
+        for finding in report["findings"]:
+            qualifier = f" [{finding['package']}]" if "package" in finding else ""
+            print(f"  {finding['severity'].upper()}: {finding['code']}{qualifier}: {finding['detail']}")
+        print("  Not verified: Composer hash, PHP manifest behavior, activation, migrations, credentials or deployment readiness.")
+    return not any(item["severity"] == "error" for item in report["findings"])
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Private Engage Core package workflow")
     commands = parser.add_subparsers(dest="action", required=True)
@@ -793,6 +1080,11 @@ def main() -> int:
     add.add_argument("--dry-run", action="store_true")
     check = commands.add_parser("verify", help="Check Composer and managed registration for a client")
     check.add_argument("client")
+    inspect = commands.add_parser("audit", help="Read-only Core client package lifecycle evidence (no .env or Composer calls)")
+    inspect.add_argument("client")
+    inspect.add_argument("--source", action="append", default=[], metavar="PATH",
+                         help="Optional explicit package checkout to inspect; repeat for several packages")
+    inspect.add_argument("--json", action="store_true", help="Emit structured findings for tooling")
     args = parser.parse_args()
     try:
         if args.action == "create":
@@ -801,6 +1093,8 @@ def main() -> int:
             install(args)
         elif args.action == "verify":
             verify(args)
+        elif args.action == "audit":
+            return 0 if audit(args) else 1
     except WorkflowError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1

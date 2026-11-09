@@ -70,6 +70,23 @@ The **developer scaffolder/managed registry** currently recognizes a singular Co
 
 **Local development:** Composer link/unlink is only an edit-speed tool. Unlinking a checkout is not uninstalling a package, disabling a module, rolling back a schema, revoking a credential or removing a provider integration.
 
+## Read-only package lifecycle evidence (10D2)
+
+Core extends the existing `scripts/package.sh` rather than adding a competing package CLI:
+
+```bash
+cd /var/www/engage-core
+./scripts/package.sh audit CLIENT_KEY
+./scripts/package.sh audit CLIENT_KEY --source /var/www/engage-donations
+./scripts/package.sh audit CLIENT_KEY --source /var/www/engage-donations --json
+```
+
+The command reads selected-client `composer.json`, `composer.lock`, `config/client_package_registry.json`, `config/client_packages.php` **as text**, and the presence of generated vendor files. Optional `--source` (repeatable) inspects the explicit package source checkout's Composer metadata and `engage-package.json` when present. The report distinguishes managed manifests, hand-maintained manifests, missing or drifted generated files, locked package references, and source descriptors that are missing or invalid. The script never evaluates arbitrary PHP manifests, calls Composer, reads `.env`, rewrites client files, updates dependencies, or provisions credentials. It is safe to run without selecting the client in the root `.env`.
+
+A missing descriptor on an existing manually maintained package is a reported **warning**, not permission to synthesize registration metadata. A hand-maintained PHP manifest is explicitly **not evaluated**: only its presence and ownership mode are known. A generated manifest that differs from its managed registry is an **error** and is not regenerated. The command exits nonzero for source-evidenced structural errors; warnings alone do not fail the audit.
+
+The report deliberately does **not** certify Composer content-hash consistency, actual dependency resolution, PHP class loading, module/feature activation, migration completion, provider role applicability, credential state or deployment readiness. Those gates remain with their existing platform commands and 35D5 work. SEO, Artist and Label are not treated as Core clients by this command; their respective tooling must preserve their documented platform-specific package contracts.
+
 ## Manifest, dependencies and compatibility
 
 The selected client's committed `composer.json` and `composer.lock` govern which private packages and revisions exist in that client. `client/vendor` is generated and not committed. Packages must not install a second Laravel/Illuminate runtime. Private package service providers and migration paths must be declared through the host's documented selected-client registration seam. Unknown metadata, ownership collisions and missing class/code dependencies fail closed.
