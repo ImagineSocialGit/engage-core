@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Support\Deployment\Data\EnvironmentIntegrityFinding;
 use App\Support\Deployment\Data\ResolvedEnvironmentRequirement;
 use App\Support\Deployment\DeploymentPlanResolver;
 use Illuminate\Console\Command;
@@ -107,7 +108,7 @@ final class EngageDeploymentPlanCommand extends Command
 
         $blocking = $plan->blockingEnvironmentRequirements();
 
-        if ($blocking !== [] || $plan->missingModuleDefinitions !== []) {
+        if (! $plan->ready()) {
             $this->newLine();
             $this->error('Deployment requirements are incomplete.');
 
@@ -115,6 +116,25 @@ final class EngageDeploymentPlanCommand extends Command
                 $this->line(sprintf(
                     '  - Module [%s] is selected or required by a selected module but has no registered definition.',
                     $moduleKey,
+                ));
+            }
+
+            foreach ($plan->environmentIntegrityFindings as $finding) {
+                $description = match ($finding->code) {
+                    EnvironmentIntegrityFinding::UNREGISTERED_REQUIREMENT,
+                    EnvironmentIntegrityFinding::UNREGISTERED_SETUP_KEY
+                        => 'Not registered in the selected-client environment catalog. Review and synchronize the owning package metadata before deployment.',
+                    EnvironmentIntegrityFinding::WRONG_SCOPE
+                        => sprintf('Found in [%s] but owned by [%s]; review its placement before deployment.', $finding->scope, $finding->expectedScope),
+                    default => 'Unresolved environment integrity finding.',
+                };
+
+                $this->line(sprintf(
+                    '  - %s [%s] (owner: %s): %s',
+                    $finding->key,
+                    $finding->code,
+                    $finding->owner,
+                    $description,
                 ));
             }
 

@@ -13,6 +13,7 @@ final readonly class DeploymentPlan
      * @param array<int, string> $knownModules
      * @param array<int, string> $selectedModules
      * @param array<int, string> $missingModuleDefinitions
+     * @param array<int, EnvironmentIntegrityFinding> $environmentIntegrityFindings
      */
     public function __construct(
         public string $environment,
@@ -25,6 +26,7 @@ final readonly class DeploymentPlan
         public array $knownModules = [],
         public array $selectedModules = [],
         public array $missingModuleDefinitions = [],
+        public array $environmentIntegrityFindings = [],
     ) {}
 
     /** @return array<int, ResolvedEnvironmentRequirement> */
@@ -39,7 +41,8 @@ final readonly class DeploymentPlan
     public function ready(): bool
     {
         return $this->blockingEnvironmentRequirements() === []
-            && $this->missingModuleDefinitions === [];
+            && $this->missingModuleDefinitions === []
+            && $this->environmentIntegrityFindings === [];
     }
 
     /** @return array<string, mixed> */
@@ -65,6 +68,10 @@ final readonly class DeploymentPlan
                 $this->setupSteps,
             ),
             'unused_environment_keys' => $this->unusedEnvironmentKeys,
+            'environment_integrity_findings' => array_map(
+                static fn (EnvironmentIntegrityFinding $finding): array => $finding->toArray(),
+                $this->environmentIntegrityFindings,
+            ),
         ];
     }
 }

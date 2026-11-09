@@ -61,9 +61,9 @@ class DeploymentSetupPlanTest extends TestCase
         $this->assertSame('webinars.zoom', $serialized[1]['key']);
     }
 
-    public function test_setup_step_cannot_reference_an_unknown_environment_key(): void
+    public function test_setup_step_with_unregistered_environment_key_blocks_with_redacted_finding(): void
     {
-        $resolver = $this->resolver([
+        $plan = $this->resolver([
             $this->contributor('core', [
                 new DeploymentSetupStep(
                     key: 'core.bad',
@@ -73,12 +73,17 @@ class DeploymentSetupPlanTest extends TestCase
                     environmentKeys: ['NOT_A_REAL_ENGAGE_ENV_KEY'],
                 ),
             ]),
-        ]);
+        ])->resolve();
 
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('references unknown environment key');
-
-        $resolver->resolve();
+        $this->assertFalse($plan->ready());
+        $this->assertSame(
+            ['unregistered_setup_key'],
+            array_column($plan->toArray()['environment_integrity_findings'], 'code'),
+        );
+        $this->assertSame(
+            'NOT_A_REAL_ENGAGE_ENV_KEY',
+            $plan->toArray()['environment_integrity_findings'][0]['key'],
+        );
     }
 
     public function test_setup_step_keys_must_be_unique_across_active_contributors(): void

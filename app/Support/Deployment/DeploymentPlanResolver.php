@@ -7,6 +7,7 @@ use App\Support\Deployment\Contracts\DeploymentSetupContributor;
 use App\Support\Deployment\Data\DeploymentPlan;
 use App\Support\Deployment\Data\DeploymentSetupStep;
 use App\Support\Deployment\Data\EnvironmentRequirement;
+use App\Support\Deployment\Data\EnvironmentIntegrityFinding;
 use App\Support\Deployment\Data\ResolvedDeploymentSetupStep;
 use App\Support\Deployment\Data\ResolvedEnvironmentRequirement;
 use App\Support\Environment\Data\EnvironmentVariableDefinition;
@@ -31,6 +32,8 @@ final class DeploymentPlanResolver
         $owners = [];
         $setupSteps = [];
         $setupStepKeys = [];
+        $environmentIntegrityFindings = [];
+        $environmentDefinitions = EnvironmentVariableCatalog::definitions();
 
         foreach ($this->contributors as $contributor) {
             if (! $contributor instanceof DeploymentPlanContributor) {
@@ -60,7 +63,17 @@ final class DeploymentPlanResolver
                     ));
                 }
 
-                $definition = EnvironmentVariableCatalog::definition($requirement->key);
+                $definition = $environmentDefinitions[$requirement->key] ?? null;
+
+                if (! $definition instanceof EnvironmentVariableDefinition) {
+                    $environmentIntegrityFindings[] = new EnvironmentIntegrityFinding(
+                        code: EnvironmentIntegrityFinding::UNREGISTERED_REQUIREMENT,
+                        key: $requirement->key,
+                        owner: $owner,
+                    );
+
+                    continue;
+                }
 
                 if ($definition->owner !== $owner) {
                     throw new InvalidArgumentException(sprintf(
@@ -109,9 +122,12 @@ final class DeploymentPlanResolver
                     }
 
                     foreach ($step->environmentKeys as $environmentKey) {
-                        if (! EnvironmentVariableCatalog::has($environmentKey)) {
-                            throw new InvalidArgumentException(
-                                "Deployment setup step [{$step->key}] references unknown environment key [{$environmentKey}].",
+                        if (! isset($environmentDefinitions[$environmentKey])) {
+                            $environmentIntegrityFindings[] = new EnvironmentIntegrityFinding(
+                                code: EnvironmentIntegrityFinding::UNREGISTERED_SETUP_KEY,
+                                key: $environmentKey,
+                                owner: $owner,
+                                setupStep: $step->key,
                             );
                         }
                     }
@@ -163,6 +179,50 @@ final class DeploymentPlanResolver
         $coveredOwners = array_keys($owners);
         sort($coveredOwners);
 
+        // A value in the wrong file must not satisfy (or shadow) the declared
+        // platform/client ownership contract. Read both persisted scopes only;
+        // process environment variables cannot substitute for target-file state.
+        foreach ([
+            EnvironmentVariableDefinition::SCOPE_ROOT,
+            EnvironmentVariableDefinition::SCOPE_CLIENT,
+        ] as $scope) {
+            foreach ($this->environmentFiles->valuesForScope($scope) as $key => $_value) {
+                $definition = $environmentDefinitions[$key] ?? null;
+
+                if ($definition instanceof EnvironmentVariableDefinition
+                    && $definition->scope !== $scope
+                ) {
+                    $environmentIntegrityFindings[] = new EnvironmentIntegrityFinding(
+                        code: EnvironmentIntegrityFinding::WRONG_SCOPE,
+                        key: $key,
+                        owner: $definition->owner,
+                        scope: $scope,
+                        expectedScope: $definition->scope,
+                    );
+                }
+            }
+        }
+
+        usort(
+            $environmentIntegrityFindings,
+            static fn (
+                EnvironmentIntegrityFinding $left,
+                EnvironmentIntegrityFinding $right,
+            ): int => [
+                $left->code,
+                $left->owner,
+                $left->key,
+                $left->scope ?? '',
+                $left->setupStep ?? '',
+            ] <=> [
+                $right->code,
+                $right->owner,
+                $right->key,
+                $right->scope ?? '',
+                $right->setupStep ?? '',
+            ],
+        );
+
         // The module registry is the authority for what this selected client
         // can activate. A missing definition must not be mistaken for a
         // deployed capability merely because its key is selected.
@@ -190,6 +250,7 @@ final class DeploymentPlanResolver
             knownModules: $knownModules,
             selectedModules: $selectedModules,
             missingModuleDefinitions: $missingModuleDefinitions,
+            environmentIntegrityFindings: $environmentIntegrityFindings,
         );
     }
 
