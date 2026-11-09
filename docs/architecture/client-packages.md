@@ -4,7 +4,7 @@
 
 Engage Core may load private Composer packages that are needed by only one or a subset of client deployments.
 
-Two package shapes are supported:
+Core supports several selected-client package shapes:
 
 ```text
 integration package
@@ -14,6 +14,13 @@ integration package
 vertical module package
     owns optional vertical/domain behavior
     contributes a real module definition and, when needed, its own migration scope
+
+vertical module group package
+    one Composer dependency contributes multiple independently selectable modules
+    each child contributes its own definition, provider and optional migration scope
+
+shared library/feature package
+    may supply pure code or optional services without becoming a Core module
 ```
 
 This keeps provider-specific and vertical-specific runtime code out of clients that do not need it while preserving one Engage Core host application and one module lifecycle.
@@ -125,7 +132,31 @@ return [
 ];
 ```
 
-A client using multiple packages composes all entries into the same manifest.
+A client using multiple packages composes all entries into the same manifest. A **vertical module group** may contribute multiple module keys from one installed Composer package; each child uses the same Core module/migration registry seam, not a separate group manager.
+
+The existing `scripts/package.sh create --type vertical-group --modules child_one,child_two` scaffolds group metadata and per-child PHP classes. Its generated `engage-package.json` uses:
+
+```json
+{
+    "kind": "vertical-group",
+    "modules": [
+        {
+            "module_key": "child_one",
+            "module_class": "ImagineSocial\\Example\\Modules\\ChildOnePackage",
+            "migration_scope": false
+        },
+        {
+            "module_key": "child_two",
+            "module_class": "ImagineSocial\\Example\\Modules\\ChildTwoPackage",
+            "migration_scope": false
+        }
+    ]
+}
+```
+
+This excerpt shows the group-specific descriptor fields, not a complete descriptor. The full scaffold includes package identity, namespace, owner and environment metadata. The managed registry generates one PHP module entry for **each child**, and only generates a corresponding migration entry when that child's `migration_scope` flag is true. Group children start migration-disabled; there is no placeholder migration and no implicit enablement.
+
+See `docs/architecture/package-lifecycle.md` for the read-only audit and deliberate legacy manifest adoption workflow. Existing manually authored Pet Services package modules are not automatically converted to a group.
 
 ### `providers`
 
@@ -193,7 +224,7 @@ vendor/<vendor>/<package>/database/migrations
 
 Engage Core normalizes that to the selected client's repository-relative vendor path and passes it through the same migration registry, planner, checksum ledger, preflight, install, migrate, reconcile, status, and setup-validation machinery used by built-in modules.
 
-A package migration scope:
+A package migration scope (including one child of a vertical group):
 
 - must belong to a module declared by the same package manifest;
 - may not collide with an Engage Core migration-scope key;

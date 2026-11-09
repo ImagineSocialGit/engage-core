@@ -8,6 +8,8 @@ It intentionally delegates local symlinks to the existing dev-link/unlink tools.
 from __future__ import annotations
 
 import argparse
+import difflib
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -85,7 +87,8 @@ def class_words(slug: str) -> str:
     return "".join(part.capitalize() for part in words(slug))
 
 
-def make_descriptor(slug: str, kind: str, owner: str, platform: str = "core") -> dict:
+def make_descriptor(slug: str, kind: str, owner: str, platform: str = "core",
+                    module_keys: list[str] | None = None) -> dict:
     if not NAME_PATTERN.fullmatch(slug):
         fail("Package repository name must be engage- followed by lowercase hyphenated words.")
     integration_prefixes = {
@@ -107,6 +110,16 @@ def make_descriptor(slug: str, kind: str, owner: str, platform: str = "core") ->
         fail("SEO package names must start with engage-seo-.")
     if platform == "artist" and not slug.startswith("engage-artist-"):
         fail("Artist package names must start with engage-artist-.")
+    if kind == "vertical-group":
+        if platform != "core":
+            fail("Vertical module groups are supported only on Core.")
+        if not module_keys or len(module_keys) < 2:
+            fail("A vertical group needs at least two --modules keys.")
+        if len(set(module_keys)) != len(module_keys) or any(
+                not MODULE_PATTERN.fullmatch(key) for key in module_keys):
+            fail("Group module keys must be unique lowercase underscore identifiers.")
+    elif module_keys is not None:
+        fail("--modules is supported only for Core vertical groups.")
     namespace = "ImagineSocial\\" + class_words(slug)
     identifier = slug.removeprefix(integration_prefixes[platform]) if kind == "integration" else slug.removeprefix("engage-")
     basename = class_words(identifier)
@@ -121,6 +134,16 @@ def make_descriptor(slug: str, kind: str, owner: str, platform: str = "core") ->
     }
     if kind == "integration":
         descriptor["service_provider"] = namespace + "\\" + basename + "ServiceProvider"
+    elif kind == "vertical-group":
+        descriptor["modules"] = [
+            {
+                "module_key": key,
+                "module_class": namespace + "\\Modules\\" + class_words(key.replace("_", "-")) + "Package",
+                "migration_scope": False,
+            }
+            for key in module_keys
+        ]
+        group_modules(descriptor)
     elif kind == "vertical" and platform == "core":
         module_key = identifier.replace("-", "_")
         descriptor["module_key"] = module_key
@@ -220,6 +243,49 @@ def package_contents(descriptor: dict, description: str) -> dict[str, str]:
             "use Illuminate\\Support\\ServiceProvider;\n\n",
         )
         files["database/migrations/.gitkeep"] = ""
+    elif kind == "vertical-group":
+        for module in descriptor["modules"]:
+            key = module["module_key"]
+            module_class = module["module_class"].rsplit("\\", 1)[1]
+            module_provider = module_class.removesuffix("Package") + "ModuleServiceProvider"
+            files[f"src/Modules/{module_class}.php"] = php_file(
+                namespace + "\\Modules", module_class,
+                f"final class {module_class}\n"
+                "{\n"
+                f"    public const MODULE_KEY = {php_literal(key)};\n\n"
+                "    /** @return array<string, mixed> */\n"
+                "    public static function moduleDefinition(): array\n    {\n"
+                "        return [\n"
+                f"            'name' => {php_literal(class_words(key.replace('_', '-')))},\n"
+                "            'depends_on' => ['core'],\n"
+                f"            'providers' => [{module_provider}::class],\n"
+                "        ];\n    }\n\n"
+                "    /** @return array{path: string} */\n"
+                "    public static function migrationScope(): array\n    {\n"
+                f"        return ['path' => {php_literal('vendor/' + name + '/database/migrations/' + key)}];\n"
+                "    }\n}\n",
+                f"use {namespace}\\Providers\\{module_provider};\n\n",
+            )
+            files[f"src/Providers/{module_provider}.php"] = php_file(
+                namespace + "\\Providers", module_provider,
+                f"final class {module_provider} extends ServiceProvider\n"
+                "{\n    public function register(): void\n    {\n"
+                "        // Register only this module's public contributions.\n"
+                "    }\n}\n",
+                "use Illuminate\\Support\\ServiceProvider;\n\n",
+            )
+            files[f"database/migrations/{key}/.gitkeep"] = ""
+        keys = ", ".join("`" + item["module_key"] + "`" for item in descriptor["modules"])
+        files["README.md"] += (
+            "\n## Core vertical module group\n\n"
+            f"Available modules: {keys}. Composer installation registers these as available, "
+            "but does not enable them. Use Core's ordinary module selection per key.\n\n"
+            "Each module owns `src/Modules/<Name>Package.php`, its runtime provider, "
+            "and `database/migrations/<module_key>/`. New migration scopes are disabled. "
+            "Add real timestamped migrations, then explicitly set that module's "
+            "`migration_scope` to true in `engage-package.json`. "
+            "Keep each module's `migrationScope()` path aligned with its folder.\n"
+        )
     elif kind == "vertical":
         provider_class = descriptor["service_provider"].rsplit("\\", 1)[1]
         key = descriptor["vertical_key"]
@@ -266,6 +332,19 @@ def package_contents(descriptor: dict, description: str) -> dict[str, str]:
             "    }\n}\n",
             "use PHPUnit\\Framework\\TestCase;\n\n",
         )
+    elif kind == "vertical-group":
+        assertions = "".join(
+            f"        self::assertSame({php_literal(item['module_key'])}, "
+            f"\\{item['module_class']}::MODULE_KEY);\n"
+            for item in descriptor["modules"]
+        )
+        test = php_file(
+            test_namespace, "PackageScaffoldTest",
+            "final class PackageScaffoldTest extends TestCase\n"
+            "{\n    public function test_independent_module_definitions_are_available_but_not_enabled(): void\n    {\n"
+            + assertions + "    }\n}\n",
+            "use PHPUnit\\Framework\\TestCase;\n\n",
+        )
     elif "service_provider" in descriptor:
         cls = descriptor["service_provider"]
         test = php_file(
@@ -297,7 +376,8 @@ def ensure_core() -> None:
 
 def create(args: argparse.Namespace) -> None:
     ensure_core()
-    descriptor = make_descriptor(args.name, args.type, args.owner, args.platform)
+    descriptor = make_descriptor(args.name, args.type, args.owner, args.platform,
+                                 args.modules.split(",") if args.modules is not None else None)
     parent = Path(args.parent).expanduser().resolve() if args.parent else ROOT.parent
     target = parent / args.name
     remote = f"{args.owner}/{args.name}"
@@ -312,6 +392,8 @@ def create(args: argparse.Namespace) -> None:
     print(f"  Namespace:  {descriptor['namespace']}")
     if args.type == "vertical" and args.platform == "core":
         print(f"  Module:     {descriptor['module_key']} (not enabled automatically)")
+    elif args.type == "vertical-group":
+        print("  Modules:    " + ", ".join(item["module_key"] for item in descriptor["modules"]))
     elif args.type == "vertical":
         print(f"  Provider:   {descriptor['service_provider']} (opt-in client registration)")
     if args.dry_run:
@@ -403,6 +485,46 @@ def create(args: argparse.Namespace) -> None:
     print(f"Tests: ./scripts/test-package.sh {args.name} --platform {args.platform}")
 
 
+def group_modules(entry: dict) -> list[dict]:
+    """Validate a plural Core module contribution without running package PHP."""
+    modules = entry.get("modules")
+    if entry.get("kind") != "vertical-group" or entry.get("platform", "core") != "core":
+        fail("Vertical module groups require a Core package descriptor.")
+    if not isinstance(modules, list) or len(modules) < 2:
+        fail("Vertical module groups require at least two module definitions.")
+    names: set[str] = set()
+    classes: set[str] = set()
+    prefix = entry.get("namespace")
+    if not isinstance(prefix, str) or not CLASS_PATTERN.fullmatch(prefix + "\\Fixture"):
+        fail("Invalid vertical group namespace.")
+    for module in modules:
+        if not isinstance(module, dict) or set(module) != {
+                "module_key", "module_class", "migration_scope"}:
+            fail("Every group module requires module_key, module_class and migration_scope only.")
+        key = module["module_key"]
+        cls = module["module_class"]
+        if not isinstance(key, str) or not MODULE_PATTERN.fullmatch(key):
+            fail("Invalid vertical group module key.")
+        if (not isinstance(cls, str) or not CLASS_PATTERN.fullmatch(cls)
+                or not cls.startswith(prefix + "\\")):
+            fail(f"Invalid group module class for {key}.")
+        if not isinstance(module["migration_scope"], bool):
+            fail(f"Group migration_scope must be a boolean for {key}.")
+        if key in names or cls in classes:
+            fail(f"Duplicate group module key or class: {key}.")
+        names.add(key)
+        classes.add(cls)
+    return modules
+
+
+def package_modules(entry: dict) -> list[dict]:
+    if entry["kind"] == "vertical-group":
+        return group_modules(entry)
+    if entry["kind"] == "vertical" and entry.get("platform", "core") == "core":
+        return [entry]
+    return []
+
+
 def validated_descriptor(source: Path) -> dict:
     descriptor_path = source / "engage-package.json"
     if not descriptor_path.is_file():
@@ -410,7 +532,7 @@ def validated_descriptor(source: Path) -> dict:
     descriptor = read_json(descriptor_path)
     kind = descriptor.get("kind")
     name = descriptor.get("name")
-    if descriptor.get("schema") != 1 or kind not in ("integration", "vertical", "library"):
+    if descriptor.get("schema") != 1 or kind not in ("integration", "vertical", "vertical-group", "library"):
         fail("Unsupported package descriptor schema/kind.")
     if not isinstance(name, str) or not name.startswith(PACKAGE_PREFIX):
         fail("Package descriptor name must use imagine-social/<slug>.")
@@ -436,6 +558,17 @@ def validated_descriptor(source: Path) -> dict:
     platform = descriptor.get("platform", "core")
     if platform not in ("core", "seo", "artist"):
         fail("Unsupported package platform.")
+    if kind == "vertical-group":
+        if any(field in descriptor for field in (
+                "service_provider", "module_key", "module_class", "vertical_key", "migration_scope")):
+            fail("Vertical group must use only its plural modules field for module contributions.")
+        for module in group_modules(descriptor):
+            if module["migration_scope"]:
+                migration_dir = source / "database" / "migrations" / module["module_key"]
+                if not migration_dir.is_dir() or not list(migration_dir.glob("*.php")):
+                    fail(f"Group module {module['module_key']} opts into migrations without migration files.")
+    elif "modules" in descriptor:
+        fail("Only Core vertical groups may declare plural modules.")
     if kind == "vertical" and platform == "core" and (
             not MODULE_PATTERN.fullmatch(str(descriptor.get("module_key", "")))
             or not descriptor.get("module_class")):
@@ -513,7 +646,7 @@ def validate_registry(registry: dict) -> list[dict]:
         name = entry["name"]
         if not name.startswith(PACKAGE_PREFIX) or not NAME_PATTERN.fullmatch(name[len(PACKAGE_PREFIX):]):
             fail(f"Invalid managed Composer package name: {name}")
-        if entry.get("kind") not in ("integration", "vertical", "library"):
+        if entry.get("kind") not in ("integration", "vertical", "vertical-group", "library"):
             fail(f"Invalid managed package kind: {name}")
         for field in ("service_provider", "module_class"):
             value = entry.get(field)
@@ -522,8 +655,15 @@ def validate_registry(registry: dict) -> list[dict]:
         if entry["kind"] == "vertical":
             if not MODULE_PATTERN.fullmatch(str(entry.get("module_key", ""))) or not entry.get("module_class"):
                 fail(f"Invalid managed vertical module: {name}")
-        elif entry.get("module_key") is not None or entry.get("module_class") is not None:
-            fail(f"Only vertical packages may contribute modules: {name}")
+            if "modules" in entry:
+                fail(f"Singular vertical cannot declare plural modules: {name}")
+        elif entry["kind"] == "vertical-group":
+            if any(field in entry for field in (
+                    "service_provider", "module_key", "module_class", "vertical_key", "migration_scope")):
+                fail(f"Group must only declare plural modules: {name}")
+            group_modules(entry)
+        elif any(field in entry for field in ("module_key", "module_class", "modules")):
+            fail(f"Only Core vertical packages may contribute modules: {name}")
         if entry["kind"] == "integration" and not entry.get("service_provider"):
             fail(f"Integration missing service provider: {name}")
         if "migration_scope" in entry and (
@@ -541,8 +681,8 @@ def validate_registry(registry: dict) -> list[dict]:
         if name in names:
             fail(f"Duplicate registered package: {name}")
         names.add(name)
-        module_key = entry.get("module_key")
-        if module_key is not None:
+        for module in package_modules(entry):
+            module_key = module["module_key"]
             if module_key in module_keys:
                 fail(f"Two packages contribute module {module_key}.")
             module_keys.add(module_key)
@@ -563,12 +703,12 @@ def manifest_php(registry: dict) -> str:
         provider = descriptor.get("service_provider")
         if provider:
             providers.append(f"        \\{provider}::class,")
-        cls = descriptor.get("module_class")
-        if cls:
+        for contribution in package_modules(descriptor):
+            cls = contribution["module_class"]
             modules.append(f"        \\{cls}::MODULE_KEY => \\{cls}::moduleDefinition(),")
-            # Older managed entries without this flag keep their original
-            # migration registration. New empty scaffolds explicitly opt out.
-            if descriptor.get("migration_scope", True):
+            # Legacy singular entries without this flag retain existing migration
+            # registration. New group modules are explicit per-module opt-ins.
+            if contribution.get("migration_scope", True):
                 migrations.append(f"        \\{cls}::MODULE_KEY => \\{cls}::migrationScope(),")
         for key, metadata in descriptor.get("environment", {}).items():
             environment.append(
@@ -651,8 +791,9 @@ def verify_installed(client: Path, descriptor: dict) -> None:
     if not path.is_dir():
         fail(f"Composer did not install expected package directory: {path}")
     run(["composer", "show", name, "--no-interaction"], cwd=client, capture=True)
-    if descriptor.get("service_provider") or descriptor.get("module_class"):
-        target = descriptor.get("service_provider") or descriptor.get("module_class")
+    classes = ([descriptor["service_provider"]] if descriptor.get("service_provider") else [])
+    classes.extend(module["module_class"] for module in package_modules(descriptor))
+    for target in classes:
         run(["php", "-r", "require $argv[1]; require $argv[2]; if (!class_exists($argv[3])) exit(3);",
              str(ROOT / "vendor" / "autoload.php"), str(client / "vendor" / "autoload.php"), target], capture=True)
 
@@ -757,8 +898,8 @@ def install(args: argparse.Namespace) -> None:
     if args.link and not link_path.is_symlink():
         run([str(ROOT / "scripts" / "dev-link-package.sh"), name, str(source), args.client])
     print("Package registered and installed. Commit client composer.json, composer.lock, config and .gitignore.")
-    if descriptor["kind"] == "vertical":
-        print(f"Module is AVAILABLE, not enabled: ./scripts/add-client-modules.sh {args.client} {descriptor['module_key']}")
+    for module in package_modules(descriptor):
+        print(f"Module AVAILABLE, not enabled: ./scripts/add-client-modules.sh {args.client} {module['module_key']}")
 
 
 def verify(args: argparse.Namespace) -> None:
@@ -772,6 +913,125 @@ def verify(args: argparse.Namespace) -> None:
         print(f"OK {entry['name']}" + (f" (local link -> {link.resolve()})" if link.is_symlink() else " (Composer-managed)"))
     if not registry["packages"]:
         print("No managed private packages installed.")
+
+
+
+
+def adoption_plan(client: Path, draft_path: Path) -> dict:
+    """Build a non-executing, full-diff adoption plan for an existing client.
+
+    This must never infer registrations from PHP. The caller supplies and
+    reviews the complete managed registry explicitly.
+    """
+    config = client / "config"
+    legacy_path = config / "client_packages.php"
+    target_registry = config / REGISTRY_NAME
+    if not (config / "client.php").is_file():
+        fail("Selected Core client does not exist.")
+    if target_registry.exists() or target_registry.is_symlink():
+        fail("Client already has a package registry. Adoption is only for hand-maintained manifests.")
+    if not legacy_path.is_file() or legacy_path.is_symlink():
+        fail("Adoption needs a regular, hand-maintained client_packages.php; never invent or follow one.")
+    original = legacy_path.read_bytes()
+    if GENERATED_HEADER.encode().strip() in original[:300]:
+        fail("Generated manifest has no registry. Repair that mismatch rather than adopting it as hand-maintained.")
+    draft = draft_path.expanduser().resolve()
+    if draft == target_registry.resolve() or draft == legacy_path.resolve():
+        fail("Draft registry must be an independent JSON source file.")
+    registry = read_json(draft)
+    registered = validate_registry(registry)
+    if not registered:
+        fail("Adoption requires a reviewed, nonempty package registry.")
+
+    # Require a complete explicit inventory. Libraries can be registered in
+    # the registry without contributing providers/modules/migrations.
+    current_audit = audit_client_package_lifecycle(client)
+    if current_audit["composer"]["state"] != "valid" or current_audit["lock"]["state"] != "valid":
+        fail("Adoption requires valid Composer requirement and lock evidence.")
+    errors = [f["code"] for f in current_audit["findings"] if f["severity"] == "error"]
+    if errors:
+        fail("Existing selected-client package audit reports structural errors: " + ", ".join(errors))
+    expected_names = set(current_audit["composer"]["private_requirements"])
+    registry_names = {entry["name"] for entry in registered}
+    if registry_names != expected_names:
+        fail("Reviewed registry must list every direct private Composer requirement exactly; "
+             f"missing={sorted(expected_names - registry_names)}, extra={sorted(registry_names - expected_names)}.")
+    locked = current_audit["lock"]["locked_packages"]
+    if any(name not in locked for name in registry_names):
+        fail("Reviewed packages must also be present in the selected-client Composer lock.")
+    if not (client / "composer.json").is_file() or not (client / "composer.lock").is_file():
+        fail("Both client composer.json and composer.lock are required for adoption.")
+
+    rendered = manifest_php(registry)
+    registry_text = pretty_json(registry)
+    # Include both old and proposed bytes and Composer evidence; applying a
+    # stale review or swapping a draft registry invalidates this fingerprint.
+    fingerprint = hashlib.sha256()
+    for item in (client.name.encode(), original, registry_text.encode(), rendered.encode(),
+                 (client / "composer.json").read_bytes(), (client / "composer.lock").read_bytes()):
+        fingerprint.update(len(item).to_bytes(8, "big"))
+        fingerprint.update(item)
+    previous_text = original.decode("utf-8", errors="replace")
+    diff = "".join(difflib.unified_diff(
+        previous_text.splitlines(keepends=True), rendered.splitlines(keepends=True),
+        fromfile="client_packages.php (current, hand-maintained)",
+        tofile="client_packages.php (proposed, generated)",
+    ))
+    return {
+        "client": client.name,
+        "fingerprint": fingerprint.hexdigest(),
+        "manifest": legacy_path,
+        "registry": target_registry,
+        "registry_text": registry_text,
+        "manifest_text": rendered,
+        "original_manifest": original,
+        "packages": sorted(registry_names),
+        "diff": diff,
+    }
+
+
+def adopt(args: argparse.Namespace) -> None:
+    ensure_core()
+    if not CLIENT_PATTERN.fullmatch(args.client):
+        fail("Invalid client key.")
+    client = ROOT / "client" / args.client
+    plan = adoption_plan(client, Path(args.registry).expanduser())
+    print(f"Core selected-client manifest adoption: {args.client}")
+    print(f"  Packages:   {', '.join(plan['packages'])}")
+    print(f"  Registry:   {plan['registry']}")
+    print(f"  Manifest:   {plan['manifest']}")
+    print(f"  Fingerprint: {plan['fingerprint']}")
+    print("  PHP was not evaluated; inspect the complete diff and verify no custom behavior will be lost.")
+    print("  Proposed manifest changes:")
+    print(plan["diff"] if plan["diff"] else "  (Generated manifest matches existing text exactly)")
+
+    if not args.apply:
+        print("Review only: no files or Composer state changed.")
+        print(f"To adopt after review: ./scripts/package.sh adopt {args.client} --registry {args.registry} "
+              f"--apply --confirm-plan {plan['fingerprint']}")
+        return
+    if not args.confirm_plan or args.confirm_plan != plan["fingerprint"]:
+        fail("--apply requires --confirm-plan with the exact fingerprint from the reviewed plan.")
+    # The read-only planning step never needs .env. Only explicitly authorized
+    # writes use the existing local/active-client guard from package install.
+    validate_client(args.client)
+    if adoption_plan(client, Path(args.registry).expanduser())["fingerprint"] != plan["fingerprint"]:
+        fail("Adoption inputs changed since the reviewed plan; rerun plan and review the diff.")
+    registry_path = plan["registry"]
+    manifest_path = plan["manifest"]
+    try:
+        registry_path.write_text(plan["registry_text"], encoding="utf-8")
+        manifest_path.write_text(plan["manifest_text"], encoding="utf-8")
+        run(["php", "-l", str(manifest_path)], capture=True)
+        # Require exact match to installer-owned format before reporting success.
+        safe_registry(client)
+        ensure_managed_runtime_permissions(client)
+    except (OSError, WorkflowError) as error:
+        manifest_path.write_bytes(plan["original_manifest"])
+        registry_path.unlink(missing_ok=True)
+        raise error
+    print("Adopted. Registry and generated manifest now match; no Composer, schema, or runtime changes were run.")
+    print("Review and commit both selected-client configuration files before future package installation.")
 
 
 
@@ -1066,8 +1326,9 @@ def main() -> int:
     commands = parser.add_subparsers(dest="action", required=True)
     make = commands.add_parser("create", help="Scaffold, commit, push a new private package")
     make.add_argument("name", help="Repository basename, e.g. engage-integration-stripe")
-    make.add_argument("--type", required=True, choices=("integration", "vertical", "library"))
+    make.add_argument("--type", required=True, choices=("integration", "vertical", "vertical-group", "library"))
     make.add_argument("--platform", choices=("core", "seo", "artist"), default="core")
+    make.add_argument("--modules", help="Comma-separated Core module keys, required for --type vertical-group")
     make.add_argument("--description", required=True)
     make.add_argument("--owner", default=os.getenv("ENGAGE_CORE_GITHUB_OWNER", DEFAULT_OWNER))
     make.add_argument("--parent", help="Parent checkout directory; defaults to Engage Core's sibling directory")
@@ -1078,6 +1339,11 @@ def main() -> int:
     add.add_argument("--link", action="store_true", help="Link the package checkout for local development")
     add.add_argument("--sync-metadata", action="store_true", help="Explicitly accept changed package registration metadata")
     add.add_argument("--dry-run", action="store_true")
+    adoption = commands.add_parser("adopt", help="Review and explicitly adopt a hand-maintained Core manifest")
+    adoption.add_argument("client")
+    adoption.add_argument("--registry", required=True, help="Path to explicitly reviewed complete registry JSON")
+    adoption.add_argument("--apply", action="store_true", help="Replace the legacy PHP manifest and create managed registry")
+    adoption.add_argument("--confirm-plan", help="Fingerprint from a reviewed adoption plan (required with --apply)")
     check = commands.add_parser("verify", help="Check Composer and managed registration for a client")
     check.add_argument("client")
     inspect = commands.add_parser("audit", help="Read-only Core client package lifecycle evidence (no .env or Composer calls)")
@@ -1093,6 +1359,8 @@ def main() -> int:
             install(args)
         elif args.action == "verify":
             verify(args)
+        elif args.action == "adopt":
+            adopt(args)
         elif args.action == "audit":
             return 0 if audit(args) else 1
     except WorkflowError as exc:

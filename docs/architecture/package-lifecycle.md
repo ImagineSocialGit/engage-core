@@ -56,7 +56,27 @@ For a package contributing multiple modules:
 - Unselected children must not be included in an enabled-only schema plan, except when a selected module explicitly depends on them.
 - The package may share internal implementation classes and infrastructure; that does not make optional child routes, schema or external-provider effects always-on.
 
-The **developer scaffolder/managed registry** currently recognizes a singular Core vertical module descriptor (`module_key`, `module_class`, `migration_scope`). Its future plural descriptor representation, any new scaffolder flags and migration from hand-maintained manifests remain **open implementation choices**; do not infer a field name or rewrite existing manifests. Runtime composition already supports more than one module, independently of that scaffolder gap.
+**10D4 implementation:** The existing Core `scripts/package.sh` now accepts `--type vertical-group --modules key_one,key_two` when creating a new Core package. The descriptor uses `kind: "vertical-group"` with a `modules` array, one `{module_key, module_class, migration_scope}` per child. Each new child has a dedicated module definition and runtime provider and an initially disabled migration scope at `database/migrations/<module_key>/`. `client_package_registry.json` and the generated PHP manifest continue to feed the existing Core module and migration registries, without a group-wide activation flag.
+
+Example scaffold (does not touch an existing package):
+
+```bash
+./scripts/package.sh create engage-animal-services --type vertical-group \
+  --modules pet_profiles,pet_bookings --description "Optional pet vertical modules" --dry-run
+```
+
+To opt a child into migrations later, place **real** timestamped Laravel migrations in that child's directory, then change that child's `migration_scope` from `false` to `true` and use the existing explicit metadata synchronization workflow. A module with `migration_scope: false` contributes no migration scope even though its `migrationScope()` method is available. This is a **new package-authoring contract**: it does not retroactively split an existing Pet Services deployment or change its module keys.
+
+## Existing Core manifest adoption (10D4)
+
+Older Core clients may have a hand-maintained `config/client_packages.php`. The managed installer still refuses to overwrite it. Adoption is a **separate, explicit local workflow**, not something an install/audit/deploy command does automatically:
+
+1. Prepare a **complete, independently reviewed** `schema: 1` JSON registry listing every direct private Composer requirement. It must declare actual package providers, module classes, migration-scope flags and environment key ownership; never infer them from a PHP file. Libraries with no runtime contributions may still be listed with no module/provider fields.
+2. Run `./scripts/package.sh adopt CLIENT_KEY --registry /path/to/reviewed-registry.json`. This reads Composer and lock evidence, shows the entire PHP manifest diff and a content-based fingerprint. It **does not execute PHP**, read the root `.env`, change files, or call Composer.
+3. Review that diff against the original client-owned PHP file and its existing runtime behavior. This is crucial because nontrivial PHP logic, extra registrations, or conditionals are not inferred and would otherwise be replaced.
+4. Only if the replacement is correct, run the explicit `--apply --confirm-plan FINGERPRINT` command printed by the review. This is restricted to the active local client by the existing `APP_ENV=local` and matching `CLIENT_KEY` guards. It creates `config/client_package_registry.json` and replaces the PHP manifest, verifies its syntax and managed consistency, and normalizes managed-file permissions. Review and commit both files.
+
+The fingerprint covers the old manifest, proposed PHP and JSON, client identity, and Composer/lock evidence. Stale plans cannot be applied. A failure restores the original PHP manifest and removes the newly created registry. The operation does not modify Composer files, perform migrations, enable modules or provision secrets. **If the PHP diff cannot be understood or safely represented by the managed registry, do not adopt that client yet; retain its hand-maintained manifest and use read-only audit.**
 
 ## Ownership and tool reuse
 
@@ -91,7 +111,7 @@ The report deliberately does **not** certify Composer content-hash consistency, 
 
 The selected client's committed `composer.json` and `composer.lock` govern which private packages and revisions exist in that client. `client/vendor` is generated and not committed. Packages must not install a second Laravel/Illuminate runtime. Private package service providers and migration paths must be declared through the host's documented selected-client registration seam. Unknown metadata, ownership collisions and missing class/code dependencies fail closed.
 
-The existing Core generated `client_package_registry.json` / `client_packages.php` pair has a different ownership mode from older hand-maintained manifests. The managed installer currently refuses to overwrite those manifests. **Preserve that refusal** until a separately reviewed adoption workflow exists. Do not silently convert clients or regenerate Composer lockfiles during read-only audits.
+The generated `client_package_registry.json` / `client_packages.php` pair is a distinct ownership mode from older hand-maintained manifests. The managed installer still refuses to overwrite hand-maintained PHP; use only the deliberate 10D4 adoption operation described above. No audit or installation silently adopts clients or regenerates their lockfiles.
 
 For already-shipped modules, schema changes require production-safe append-only migrations; do not rerun scaffolds or edit deployed migration history. Development-only module schema can follow the existing explicit dev refresh policy. Removal of an installed package must not drop customer data implicitly.
 
@@ -118,11 +138,11 @@ For a new package, verify the applicable (not artificially universal) gates:
 
 ## Implementation sequence and open decisions
 
-1. **10D1 (this batch):** Establish the shared semantic contract and regression-test Core's existing multi-module package runtime. No installer behavior changes.
+1. **10D1:** Establish the shared semantic contract and regression-test Core's existing multi-module package runtime. No installer behavior changes.
 2. Add a read-only lifecycle audit/plan to the existing developer and platform tools, including missing descriptor/manifest/lock evidence without guessed states.
-3. Decide and implement managed **plural module-group descriptor** and a deliberate legacy manifest adoption workflow; extend `package.sh` without replacing its existing local-only safety checks.
+3. **10D4:** Extend the existing Core package scaffolder/registry with plural group descriptors and a reviewed, fingerprint-confirmed path for adopting hand-maintained manifests. No runtime migration or module activation changes.
 4. Align existing standalone packages with their applicable type contracts (including Stripe, Shopify, Donations, SEO verticals, Event Signup Kit and Pet Services).
 5. Implement 35D5 conditional credential discovery and authorized provisioning through the established Core contributors and platform-owned recipients.
 6. Connect capability gates to Infrastructure's New Client / Update Client / Add Platform workflow when each platform's source release path is verified.
 
-Separate decisions still required: plural group descriptor shape; existing hand-maintained Core manifest adoption; whether/when Label supports selected-client packages; and exact deployment hooks for SEO/Artist immutable releases. Their absence must block only the corresponding implementation batch, not invalidate the already supported Core runtime composition.
+Separate decisions still required: whether/when Label supports selected-client packages, how to migrate an existing Pet Services client to plural modules (if desired), and exact deployment hooks for SEO/Artist immutable releases. Their absence must block only the corresponding implementation batch, not invalidate the already supported Core runtime composition.
