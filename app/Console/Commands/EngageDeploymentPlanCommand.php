@@ -33,6 +33,8 @@ final class EngageDeploymentPlanCommand extends Command
         $this->line('Environment: '.$plan->environment);
         $this->line('Client:      '.($plan->clientKey !== '' ? $plan->clientKey : '[none]'));
         $this->line('Modules:     '.implode(', ', $plan->enabledModules));
+        $this->line('Selected:    '.implode(', ', $plan->selectedModules));
+        $this->line('Known:       '.count($plan->knownModules).' module definitions');
         $this->line('Coverage:    '.implode(', ', $plan->coveredOwners));
         $this->newLine();
 
@@ -105,9 +107,16 @@ final class EngageDeploymentPlanCommand extends Command
 
         $blocking = $plan->blockingEnvironmentRequirements();
 
-        if ($blocking !== []) {
+        if ($blocking !== [] || $plan->missingModuleDefinitions !== []) {
             $this->newLine();
             $this->error('Deployment requirements are incomplete.');
+
+            foreach ($plan->missingModuleDefinitions as $moduleKey) {
+                $this->line(sprintf(
+                    '  - Module [%s] is selected or required by a selected module but has no registered definition.',
+                    $moduleKey,
+                ));
+            }
 
             foreach ($blocking as $requirement) {
                 $secret = $requirement->definition->secret ? ' [secret]' : '';

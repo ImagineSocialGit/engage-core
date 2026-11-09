@@ -163,10 +163,23 @@ final class DeploymentPlanResolver
         $coveredOwners = array_keys($owners);
         sort($coveredOwners);
 
+        // The module registry is the authority for what this selected client
+        // can activate. A missing definition must not be mistaken for a
+        // deployed capability merely because its key is selected.
+        $knownModules = array_keys($this->modules->definitions());
+        sort($knownModules, SORT_STRING);
+        $selectedModules = $this->modules->enabledKeys();
+        $enabledModules = $this->modules->enabledKeysWithDependencies();
+        $missingModuleDefinitions = array_values(array_diff(
+            $enabledModules,
+            $knownModules,
+        ));
+        sort($missingModuleDefinitions, SORT_STRING);
+
         return new DeploymentPlan(
             environment: app()->environment(),
             clientKey: (string) config('client.key', ''),
-            enabledModules: $this->modules->enabledKeysWithDependencies(),
+            enabledModules: $enabledModules,
             environmentRequirements: $resolved,
             unusedEnvironmentKeys: $this->unusedEnvironmentKeys(
                 coveredOwners: $coveredOwners,
@@ -174,6 +187,9 @@ final class DeploymentPlanResolver
             ),
             coveredOwners: $coveredOwners,
             setupSteps: $setupSteps,
+            knownModules: $knownModules,
+            selectedModules: $selectedModules,
+            missingModuleDefinitions: $missingModuleDefinitions,
         );
     }
 

@@ -10,6 +10,9 @@ final readonly class DeploymentPlan
      * @param array<int, string> $unusedEnvironmentKeys
      * @param array<int, string> $coveredOwners
      * @param array<int, ResolvedDeploymentSetupStep> $setupSteps
+     * @param array<int, string> $knownModules
+     * @param array<int, string> $selectedModules
+     * @param array<int, string> $missingModuleDefinitions
      */
     public function __construct(
         public string $environment,
@@ -19,6 +22,9 @@ final readonly class DeploymentPlan
         public array $unusedEnvironmentKeys,
         public array $coveredOwners,
         public array $setupSteps = [],
+        public array $knownModules = [],
+        public array $selectedModules = [],
+        public array $missingModuleDefinitions = [],
     ) {}
 
     /** @return array<int, ResolvedEnvironmentRequirement> */
@@ -32,7 +38,8 @@ final readonly class DeploymentPlan
 
     public function ready(): bool
     {
-        return $this->blockingEnvironmentRequirements() === [];
+        return $this->blockingEnvironmentRequirements() === []
+            && $this->missingModuleDefinitions === [];
     }
 
     /** @return array<string, mixed> */
@@ -42,6 +49,11 @@ final readonly class DeploymentPlan
             'environment' => $this->environment,
             'client_key' => $this->clientKey,
             'enabled_modules' => $this->enabledModules,
+            'module_selection' => [
+                'known_modules' => $this->knownModules,
+                'selected_modules' => $this->selectedModules,
+                'missing_module_definitions' => $this->missingModuleDefinitions,
+            ],
             'covered_owners' => $this->coveredOwners,
             'ready' => $this->ready(),
             'environment_requirements' => array_map(
