@@ -123,14 +123,30 @@ def build_bootstrap(host: Path, package: Path, composer: dict) -> str:
     namespaces, files = mappings(composer, package)
     host_autoload = host / "vendor" / "autoload.php"
     host_bootstrap = host / "tests" / "bootstrap.php"
+    package_autoload = package / "vendor" / "autoload.php"
     if not host_autoload.is_file():
         fail(f"Host Composer dependencies are missing: {host_autoload}")
-    statements = ["<?php", "", "// Temporary package-only PHPUnit bootstrap; host test isolation is preserved.",
-                  f"$engagePackageLoader = require {php_string(str(host_autoload))};",
-                  "if (!$engagePackageLoader instanceof \\Composer\\Autoload\\ClassLoader) {",
-                  "    throw new \\RuntimeException('Host Composer autoloader unavailable.');", "}"]
+    statements = [
+        "<?php", "",
+        "// Temporary host-isolated bootstrap; no selected-client autoloader is loaded.",
+        f"$engageHostLoader = require {php_string(str(host_autoload))};",
+        "if (!$engageHostLoader instanceof \\Composer\\Autoload\\ClassLoader) {",
+        "    throw new \\RuntimeException('Host Composer autoloader unavailable.');",
+        "}",
+    ]
+    if package_autoload.is_file():
+        statements.extend([
+            "// Load this package's locked Composer dependencies when installed.",
+            f"$engageDependencyLoader = require {php_string(str(package_autoload))};",
+            "if (!$engageDependencyLoader instanceof \\Composer\\Autoload\\ClassLoader) {",
+            "    throw new \\RuntimeException('Package Composer autoloader unavailable.');",
+            "}",
+            "// Host-owned framework classes take priority over package dev dependencies.",
+            "$engageHostLoader->register(true);",
+        ])
     for namespace, path in namespaces:
-        statements.append(f"$engagePackageLoader->addPsr4({php_string(namespace)}, {php_string(str(path))});")
+        # Source checkout wins over any stale copy of the package in vendor/.
+        statements.append(f"$engageHostLoader->addPsr4({php_string(namespace)}, {php_string(str(path))}, true);")
     for file in files:
         statements.append(f"require_once {php_string(str(file))};")
     if host_bootstrap.is_file():
@@ -182,6 +198,11 @@ def run_tests(args: argparse.Namespace) -> int:
     print(f"Package: {package.name}", flush=True)
     print(f"Host:    {platform} ({host})", flush=True)
     print("Client:  isolated (no selected-client dependency)", flush=True)
+    print("Dependencies: " + (
+        "package Composer autoload available (host framework takes precedence)"
+        if (package / "vendor" / "autoload.php").is_file()
+        else "host autoload only (run composer install in the package if its dependencies are needed)"
+    ), flush=True)
     if args.dry_run:
         print("Command: " + " ".join(command_display))
         print("Dry run: no tests executed or project files changed.")
