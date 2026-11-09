@@ -35,6 +35,32 @@ final class DeploymentPlanResolver
         $environmentIntegrityFindings = [];
         $environmentDefinitions = EnvironmentVariableCatalog::definitions();
 
+        // Inspect each persisted file once before evaluating contributors.
+        // Keep parsing failures and duplicates as redacted blockers rather
+        // than allowing a process environment to hide malformed file state.
+        $persistedByScope = [];
+
+        foreach ([
+            EnvironmentVariableDefinition::SCOPE_ROOT,
+            EnvironmentVariableDefinition::SCOPE_CLIENT,
+        ] as $scope) {
+            $inspection = $this->environmentFiles->inspectScope($scope);
+            $persistedByScope[$scope] = $inspection['values'];
+
+            foreach ($inspection['issues'] as $issue) {
+                $definition = $environmentDefinitions[$issue['key']] ?? null;
+                $environmentIntegrityFindings[] = new EnvironmentIntegrityFinding(
+                    code: $issue['code'],
+                    key: $issue['key'],
+                    owner: $definition instanceof EnvironmentVariableDefinition
+                        ? $definition->owner
+                        : 'core',
+                    scope: $scope,
+                    line: $issue['line'],
+                );
+            }
+        }
+
         foreach ($this->contributors as $contributor) {
             if (! $contributor instanceof DeploymentPlanContributor) {
                 throw new InvalidArgumentException(sprintf(
@@ -162,6 +188,7 @@ final class DeploymentPlanResolver
                 owner: $owner,
                 definition: $definition,
                 requirement: $requirement,
+                persistedValues: $persistedByScope[$definition->scope],
             );
         }
 
@@ -186,7 +213,7 @@ final class DeploymentPlanResolver
             EnvironmentVariableDefinition::SCOPE_ROOT,
             EnvironmentVariableDefinition::SCOPE_CLIENT,
         ] as $scope) {
-            foreach ($this->environmentFiles->valuesForScope($scope) as $key => $_value) {
+            foreach ($persistedByScope[$scope] as $key => $_value) {
                 $definition = $environmentDefinitions[$key] ?? null;
 
                 if ($definition instanceof EnvironmentVariableDefinition
@@ -244,6 +271,7 @@ final class DeploymentPlanResolver
             unusedEnvironmentKeys: $this->unusedEnvironmentKeys(
                 coveredOwners: $coveredOwners,
                 claimedKeys: array_keys($requirements),
+                persistedByScope: $persistedByScope,
             ),
             coveredOwners: $coveredOwners,
             setupSteps: $setupSteps,
@@ -258,8 +286,8 @@ final class DeploymentPlanResolver
         string $owner,
         EnvironmentVariableDefinition $definition,
         EnvironmentRequirement $requirement,
+        array $persistedValues,
     ): ResolvedEnvironmentRequirement {
-        $persistedValues = $this->environmentFiles->valuesForScope($definition->scope);
         $persisted = array_key_exists($definition->key, $persistedValues);
         $persistedValue = $persisted ? $persistedValues[$definition->key] : null;
         $hasPersistedValue = $persisted && $this->hasUsableValue($persistedValue);
@@ -305,9 +333,10 @@ final class DeploymentPlanResolver
      *
      * @param array<int, string> $coveredOwners
      * @param array<int, string> $claimedKeys
+     * @param array<string, array<string, string>> $persistedByScope
      * @return array<int, string>
      */
-    private function unusedEnvironmentKeys(array $coveredOwners, array $claimedKeys): array
+    private function unusedEnvironmentKeys(array $coveredOwners, array $claimedKeys, array $persistedByScope): array
     {
         $unused = [];
         $claimed = array_fill_keys($claimedKeys, true);
@@ -317,7 +346,7 @@ final class DeploymentPlanResolver
             EnvironmentVariableDefinition::SCOPE_ROOT,
             EnvironmentVariableDefinition::SCOPE_CLIENT,
         ] as $scope) {
-            foreach ($this->environmentFiles->valuesForScope($scope) as $key => $_value) {
+            foreach ($persistedByScope[$scope] as $key => $_value) {
                 if (isset($claimed[$key]) || ! EnvironmentVariableCatalog::has($key)) {
                     continue;
                 }

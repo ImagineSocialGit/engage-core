@@ -126,6 +126,14 @@ final class EngageDeploymentPlanCommand extends Command
                         => 'Not registered in the selected-client environment catalog. Review and synchronize the owning package metadata before deployment.',
                     EnvironmentIntegrityFinding::WRONG_SCOPE
                         => sprintf('Found in [%s] but owned by [%s]; review its placement before deployment.', $finding->scope, $finding->expectedScope),
+                    EnvironmentIntegrityFinding::DUPLICATE_KEY
+                        => sprintf('Defined more than once in the [%s] environment%s; remove the duplicate before deployment.',
+                            $finding->scope,
+                            $finding->line !== null ? ' (second assignment at line '.$finding->line.')' : ''),
+                    EnvironmentIntegrityFinding::MALFORMED_FILE
+                        => sprintf('The [%s] environment file contains invalid dotenv syntax; correct it before deployment.', $finding->scope),
+                    EnvironmentIntegrityFinding::UNREADABLE_FILE
+                        => sprintf('The [%s] environment file could not be read; check file access before deployment.', $finding->scope),
                     default => 'Unresolved environment integrity finding.',
                 };
 
