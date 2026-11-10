@@ -272,6 +272,7 @@ final class DeploymentPlanResolver
                 coveredOwners: $coveredOwners,
                 claimedKeys: array_keys($requirements),
                 persistedByScope: $persistedByScope,
+                environmentDefinitions: $environmentDefinitions,
             ),
             coveredOwners: $coveredOwners,
             setupSteps: $setupSteps,
@@ -334,9 +335,15 @@ final class DeploymentPlanResolver
      * @param array<int, string> $coveredOwners
      * @param array<int, string> $claimedKeys
      * @param array<string, array<string, string>> $persistedByScope
+     * @param array<string, EnvironmentVariableDefinition> $environmentDefinitions
      * @return array<int, string>
      */
-    private function unusedEnvironmentKeys(array $coveredOwners, array $claimedKeys, array $persistedByScope): array
+    private function unusedEnvironmentKeys(
+        array $coveredOwners,
+        array $claimedKeys,
+        array $persistedByScope,
+        array $environmentDefinitions,
+    ): array
     {
         $unused = [];
         $claimed = array_fill_keys($claimedKeys, true);
@@ -347,11 +354,14 @@ final class DeploymentPlanResolver
             EnvironmentVariableDefinition::SCOPE_CLIENT,
         ] as $scope) {
             foreach ($persistedByScope[$scope] as $key => $_value) {
-                if (isset($claimed[$key]) || ! EnvironmentVariableCatalog::has($key)) {
+                if (isset($claimed[$key])) {
                     continue;
                 }
 
-                $definition = EnvironmentVariableCatalog::definition($key);
+                $definition = $environmentDefinitions[$key] ?? null;
+                if (! $definition instanceof EnvironmentVariableDefinition) {
+                    continue;
+                }
 
                 if (isset($covered[$definition->owner])) {
                     $unused[] = $key;

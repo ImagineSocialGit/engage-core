@@ -3,13 +3,14 @@
 namespace App\Support\Environment;
 
 use App\Support\Clients\ClientPackageRuntime;
+use App\Support\Deployment\Contracts\DeploymentEnvironmentDefinitionContributor;
 use App\Support\Environment\Data\EnvironmentVariableDefinition;
 use InvalidArgumentException;
 
 final class EnvironmentVariableCatalog
 {
     /**
-     * Exhaustive Engage-owned environment catalog.
+     * Effective Engage-owned environment catalog for the selected client.
      *
      * This catalog answers ownership/sensitivity only. Whether a specific
      * client deployment actually needs a key is resolved later by deployment
@@ -18,6 +19,60 @@ final class EnvironmentVariableCatalog
      * @return array<string, EnvironmentVariableDefinition>
      */
     public static function definitions(): array
+    {
+        $definitions = self::templateDefinitions();
+
+        // Dynamic selected-client keys (for example, one signing key per
+        // authorized external caller) belong to the enabled module that
+        // consumes them. Reuse the existing deployment contributor lifecycle:
+        // an installed but unselected package never registers its contributor.
+        // Neither an environment value nor a requested key can register itself.
+        foreach (app()->tagged('deployment.plan_contributors') as $contributor) {
+            if (! $contributor instanceof DeploymentEnvironmentDefinitionContributor) {
+                continue;
+            }
+
+            $owner = $contributor->owner();
+            if ($owner === '' || trim($owner) !== $owner) {
+                throw new InvalidArgumentException(
+                    'Dynamic environment contributor returned an invalid owner.',
+                );
+            }
+
+            foreach ($contributor->environmentDefinitions() as $definition) {
+                if (! $definition instanceof EnvironmentVariableDefinition) {
+                    throw new InvalidArgumentException(
+                        "Dynamic environment contributor [{$owner}] returned an invalid definition.",
+                    );
+                }
+
+                if ($definition->owner !== $owner) {
+                    throw new InvalidArgumentException(
+                        "Dynamic environment key [{$definition->key}] cannot be claimed by an unrelated owner.",
+                    );
+                }
+
+                if (array_key_exists($definition->key, $definitions)) {
+                    throw new InvalidArgumentException(
+                        "Dynamic environment key [{$definition->key}] conflicts with a registered environment key.",
+                    );
+                }
+
+                $definitions[$definition->key] = $definition;
+            }
+        }
+
+        return $definitions;
+    }
+
+    /**
+     * Static environment catalog used by reference .env templates.
+     * Caller-specific keys are intentionally NOT included here: their
+     * identities exist only for selected, activated capability instances.
+     *
+     * @return array<string, EnvironmentVariableDefinition>
+     */
+    public static function templateDefinitions(): array
     {
         $definitions = self::builtInDefinitions();
 

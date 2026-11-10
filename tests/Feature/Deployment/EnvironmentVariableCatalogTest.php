@@ -50,7 +50,9 @@ class EnvironmentVariableCatalogTest extends TestCase
         ]));
         sort($documented);
 
-        $catalog = EnvironmentVariableCatalog::keys();
+        // Reference templates contain only static keys. Per-caller keys are
+        // discovered from enabled package contributors for a selected client.
+        $catalog = array_keys(EnvironmentVariableCatalog::templateDefinitions());
         sort($catalog);
 
         $this->assertSame($catalog, $documented);
