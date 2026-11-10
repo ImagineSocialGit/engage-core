@@ -12,22 +12,6 @@ namespace App\Support\Deployment\Credentials;
  */
 final class CoreCredentialInstallationContract
 {
-    /**
-     * These namespaces describe Core's existing Forms/Donations recipient
-     * keys, not feature implementations or a credential issuance registry.
-     * Each feature owner is responsible for its eventual runtime binding.
-     */
-    private const PURPOSES = [
-        'forms.external_intake' => [
-            'prefix' => 'FORMS_EXTERNAL_INTAKE_CALLER_',
-            'suffix' => '_SECRET',
-        ],
-        'donations.external_checkout' => [
-            'prefix' => 'DONATIONS_EXTERNAL_CHECKOUT_CALLER_',
-            'suffix' => '_SIGNING_SECRET',
-        ],
-    ];
-
     public function __construct(
         private readonly CoreCredentialRecipientInspector $recipients = new CoreCredentialRecipientInspector(),
     ) {}
@@ -48,6 +32,8 @@ final class CoreCredentialInstallationContract
         array $deploymentPlan,
         mixed $capabilityConfig,
         array $persistedClientEnvironment,
+        array $persistedRootEnvironment = [],
+        array $environmentIssues = [],
     ): array {
         $recipient = $this->recipients->inspect(
             purpose: $purpose,
@@ -58,6 +44,9 @@ final class CoreCredentialInstallationContract
             expectedEnvironment: $expectedEnvironment,
             deploymentPlan: $deploymentPlan,
             capabilityConfig: $capabilityConfig,
+            persistedClientEnvironment: $persistedClientEnvironment,
+            persistedRootEnvironment: $persistedRootEnvironment,
+            environmentIssues: $environmentIssues,
         );
         $findings = $recipient['findings'];
         $status = $recipient['status'];
@@ -86,11 +75,17 @@ final class CoreCredentialInstallationContract
                 if ($recipient['secret_present']) {
                     $status = 'existing_secret_unverified';
                     $candidateKey = null;
-                    if ($declared !== null) {
-                        $findings[] = 'existing_secret_binding_requires_reconciliation';
-                    }
-                    if ($hasCandidateValue) {
-                        $findings[] = 'coexisting_internal_credential_requires_reconciliation';
+                    // Donations' package consumer (B15) reads the selected-client
+                    // per-caller key, not an inline 'secret' value.
+                    if ($purpose === 'donations.external_checkout') {
+                        $bindingDeclared = $declared === $this->keyFor($purpose, $sourcePlatform, $callerId);
+                    } else {
+                        if ($declared !== null) {
+                            $findings[] = 'existing_secret_binding_requires_reconciliation';
+                        }
+                        if ($hasCandidateValue) {
+                            $findings[] = 'coexisting_internal_credential_requires_reconciliation';
+                        }
                     }
                 } else {
                     // New slots must declare their exact per-caller key.
@@ -156,20 +151,6 @@ final class CoreCredentialInstallationContract
      */
     public function keyFor(string $purpose, string $sourcePlatform, string $callerId): ?string
     {
-        $route = self::PURPOSES[$purpose] ?? null;
-        if ($route === null || ! in_array($sourcePlatform, ['seo', 'artist'], true)
-            || ($purpose === 'donations.external_checkout' && $sourcePlatform !== 'seo')
-            || preg_match('/\A[a-z][a-z0-9_.-]{0,127}\z/D', $callerId) !== 1
-        ) {
-            return null;
-        }
-
-        // Fixed-length digest avoids collisions from replacing dots/hyphens
-        // and never leaks the caller identity through an env variable name.
-        $digest = strtoupper(substr(hash('sha256', implode("\0", [
-            'engage-core-recipient-v1', $purpose, $sourcePlatform, $callerId,
-        ])), 0, 32));
-
-        return $route['prefix'].$digest.$route['suffix'];
+        return CoreCredentialCallerKey::forCaller($purpose, $sourcePlatform, $callerId);
     }
 }

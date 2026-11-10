@@ -4,6 +4,8 @@ namespace App\Console\Commands;
 
 use App\Support\Deployment\Credentials\CoreCredentialRecipientInspector;
 use App\Support\Deployment\DeploymentPlanResolver;
+use App\Support\Deployment\EnvironmentFileRepository;
+use App\Support\Environment\Data\EnvironmentVariableDefinition;
 use Illuminate\Console\Command;
 use Throwable;
 
@@ -23,9 +25,12 @@ final class InspectCoreCredentialRecipientCommand extends Command
     public function handle(
         DeploymentPlanResolver $plans,
         CoreCredentialRecipientInspector $inspector,
+        EnvironmentFileRepository $environmentFiles,
     ): int {
         try {
             $purpose = (string) $this->argument('purpose');
+            $clientFile = $environmentFiles->inspectScope(EnvironmentVariableDefinition::SCOPE_CLIENT);
+            $rootFile = $environmentFiles->inspectScope(EnvironmentVariableDefinition::SCOPE_ROOT);
             $result = $inspector->inspect(
                 purpose: $purpose,
                 sourcePlatform: (string) $this->option('source-platform'),
@@ -39,6 +44,9 @@ final class InspectCoreCredentialRecipientCommand extends Command
                     'donations.external_checkout' => config('donations.external_checkout'),
                     default => null,
                 },
+                persistedClientEnvironment: $clientFile['values'],
+                persistedRootEnvironment: $rootFile['values'],
+                environmentIssues: array_merge($clientFile['issues'], $rootFile['issues']),
             );
         } catch (Throwable) {
             // A malformed runtime/plan must not leak environment material or a

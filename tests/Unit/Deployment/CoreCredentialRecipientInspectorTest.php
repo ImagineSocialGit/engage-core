@@ -3,6 +3,7 @@
 namespace Tests\Unit\Deployment;
 
 use App\Support\Deployment\Credentials\CoreCredentialRecipientInspector;
+use App\Support\Deployment\Credentials\CoreCredentialCallerKey;
 use PHPUnit\Framework\TestCase;
 
 final class CoreCredentialRecipientInspectorTest extends TestCase
@@ -11,15 +12,17 @@ final class CoreCredentialRecipientInspectorTest extends TestCase
 
     public function test_selected_donations_caller_reports_configured_but_never_authorizes_issuance(): void
     {
+        $key = $this->key('nonprofit_primary');
         $report = $this->inspect(
             'donations.external_checkout', 'seo', 'nonprofit_primary',
             'https://nonprofit.example',
             $this->plan('donations'),
             ['enabled' => true, 'clients' => [
-                'nonprofit_primary' => ['secret' => self::SECRET, 'site_origin' => 'https://nonprofit.example'],
-                'nonprofit_secondary' => ['secret' => 'other-private-secret-material-1234567', 'site_origin' => 'https://another.example'],
+                'nonprofit_primary' => ['secret_env_key' => $key, 'site_origin' => 'https://nonprofit.example'],
+                'nonprofit_secondary' => ['secret_env_key' => $this->key('nonprofit_secondary'), 'site_origin' => 'https://another.example'],
             ]],
             'staging',
+            [$key => str_repeat('S', 64)],
         );
 
         self::assertSame('configured_unverified', $report['status']);
@@ -49,7 +52,7 @@ final class CoreCredentialRecipientInspectorTest extends TestCase
 
         $report = $this->inspect('donations.external_checkout', 'seo', 'test_site',
             'https://nonprofit.example', $plan,
-            ['enabled' => true, 'clients' => ['test_site' => ['secret' => self::SECRET, 'site_origin' => 'https://nonprofit.example']]],
+            ['enabled' => true, 'clients' => ['test_site' => ['secret_env_key' => $this->key('test_site'), 'site_origin' => 'https://nonprofit.example']]],
             'staging');
 
         self::assertSame('not_required', $report['status']);
@@ -70,7 +73,7 @@ final class CoreCredentialRecipientInspectorTest extends TestCase
     {
         $report = $this->inspect('donations.external_checkout', 'seo', 'test_site',
             'https://nonprofit.example', $this->plan('donations'),
-            ['enabled' => true, 'clients' => ['test_site' => ['secret' => null, 'site_origin' => 'https://nonprofit.example']]],
+            ['enabled' => true, 'clients' => ['test_site' => ['secret_env_key' => $this->key('test_site'), 'site_origin' => 'https://nonprofit.example']]],
             'staging');
 
         self::assertSame('needs_provisioning', $report['status']);
@@ -88,8 +91,8 @@ final class CoreCredentialRecipientInspectorTest extends TestCase
 
         $report = $this->inspect('donations.external_checkout', 'seo', 'test_site',
             'https://nonprofit.example', $plan,
-            ['enabled' => true, 'clients' => ['test_site' => ['secret' => self::SECRET, 'site_origin' => 'https://nonprofit.example']]],
-            'staging');
+            ['enabled' => true, 'clients' => ['test_site' => ['secret_env_key' => $this->key('test_site'), 'site_origin' => 'https://nonprofit.example']]],
+            'staging', [$this->key('test_site') => str_repeat('S', 64)]);
 
         self::assertSame('configured_unverified', $report['status']);
     }
@@ -98,12 +101,73 @@ final class CoreCredentialRecipientInspectorTest extends TestCase
     {
         $report = $this->inspect('donations.external_checkout', 'seo', 'test_site',
             'https://nonprofit.example', $this->plan('donations'),
-            ['enabled' => true, 'clients' => ['test_site' => ['secret' => self::SECRET, 'site_origin' => 'https://unrelated.example']]],
+            ['enabled' => true, 'clients' => ['test_site' => ['secret_env_key' => $this->key('test_site'), 'site_origin' => 'https://unrelated.example']]],
             'staging');
 
         self::assertSame('blocked', $report['status']);
         self::assertContains('caller_origin_mismatch', $report['findings']);
         self::assertStringNotContainsString('unrelated.example', json_encode($report, JSON_THROW_ON_ERROR));
+    }
+
+    public function test_donations_declared_key_must_be_present_in_selected_client_environment(): void
+    {
+        $key = $this->key('test_site');
+        $config = ['enabled' => true, 'clients' => [
+            'test_site' => ['site_origin' => 'https://nonprofit.example', 'secret_env_key' => $key],
+        ]];
+        $missing = $this->inspect('donations.external_checkout', 'seo', 'test_site',
+            'https://nonprofit.example', $this->plan('donations'), $config, 'staging');
+        self::assertSame('needs_provisioning', $missing['status']);
+        self::assertFalse($missing['secret_present']);
+
+        $present = $this->inspect('donations.external_checkout', 'seo', 'test_site',
+            'https://nonprofit.example', $this->plan('donations'), $config, 'staging',
+            [$key => str_repeat('A', 64)]);
+        self::assertSame('configured_unverified', $present['status']);
+        self::assertTrue($present['secret_present']);
+        self::assertFalse($present['credential_match_verified']);
+    }
+
+    public function test_donations_rejects_inline_binding_conflict_wrong_scope_and_invalid_value(): void
+    {
+        $key = $this->key('test_site');
+        $config = ['enabled' => true, 'clients' => [
+            'test_site' => ['site_origin' => 'https://nonprofit.example', 'secret_env_key' => $key],
+        ]];
+        $plan = $this->plan('donations');
+
+        $wrongScope = $this->inspect('donations.external_checkout', 'seo', 'test_site',
+            'https://nonprofit.example', $plan, $config, 'staging', [], [$key => str_repeat('A', 64)]);
+        self::assertContains('caller_secret_wrong_scope', $wrongScope['findings']);
+
+        $bad = $this->inspect('donations.external_checkout', 'seo', 'test_site',
+            'https://nonprofit.example', $plan, $config, 'staging', [$key => 'injected-secret=bad']);
+        self::assertContains('caller_secret_invalid', $bad['findings']);
+        self::assertStringNotContainsString('injected-secret', json_encode($bad, JSON_THROW_ON_ERROR));
+
+        $config['clients']['test_site']['secret'] = str_repeat('Z', 64);
+        $inline = $this->inspect('donations.external_checkout', 'seo', 'test_site',
+            'https://nonprofit.example', $plan, $config, 'staging', [$key => str_repeat('A', 64)]);
+        self::assertContains('unsupported_inline_signing_secret', $inline['findings']);
+    }
+
+    public function test_invalid_binding_or_corrupt_env_blocks_without_exposing_values(): void
+    {
+        $key = $this->key('test_site');
+        $config = ['enabled' => true, 'clients' => [
+            'test_site' => ['site_origin' => 'https://nonprofit.example', 'secret_env_key' => $this->key('other_site')],
+        ]];
+        $wrong = $this->inspect('donations.external_checkout', 'seo', 'test_site',
+            'https://nonprofit.example', $this->plan('donations'), $config, 'staging');
+        self::assertContains('caller_secret_binding_invalid', $wrong['findings']);
+
+        $config['clients']['test_site']['secret_env_key'] = $key;
+        $broken = $this->inspect('donations.external_checkout', 'seo', 'test_site',
+            'https://nonprofit.example', $this->plan('donations'), $config, 'staging',
+            [$key => str_repeat('A', 64)], [], [['code' => 'duplicate_environment_key', 'key' => $key]]);
+        self::assertSame('blocked', $broken['status']);
+        self::assertContains('environment_file_integrity_invalid', $broken['findings']);
+        self::assertStringNotContainsString($key, json_encode($broken, JSON_THROW_ON_ERROR));
     }
 
     public function test_forms_recipient_keeps_source_identity_distinct_from_authorized_peer(): void
@@ -161,10 +225,10 @@ final class CoreCredentialRecipientInspectorTest extends TestCase
         $report = $this->inspect('donations.external_checkout', 'seo', 'test_site',
             'http://nonprofit.example', $this->plan('donations'),
             ['enabled' => true, 'clients' => ['test_site' => [
-                'secret' => self::SECRET,
+                'secret_env_key' => $this->key('test_site'),
                 'site_origin' => 'http://nonprofit.example',
             ]]], 'local');
-        self::assertSame('configured_unverified', $report['status']);
+        self::assertSame('needs_provisioning', $report['status']);
     }
 
     public function test_unrecognized_pair_and_untrusted_ids_are_redacted_and_blocked(): void
@@ -225,6 +289,9 @@ final class CoreCredentialRecipientInspectorTest extends TestCase
         array $plan,
         mixed $config,
         string $environment,
+        array $clientEnvironment = [],
+        array $rootEnvironment = [],
+        array $issues = [],
     ): array {
         $plan['environment'] = $environment;
 
@@ -237,7 +304,15 @@ final class CoreCredentialRecipientInspectorTest extends TestCase
             expectedEnvironment: $environment,
             deploymentPlan: $plan,
             capabilityConfig: $config,
+            persistedClientEnvironment: $clientEnvironment,
+            persistedRootEnvironment: $rootEnvironment,
+            environmentIssues: $issues,
         );
+    }
+
+    private function key(string $caller): string
+    {
+        return (string) CoreCredentialCallerKey::forCaller('donations.external_checkout', 'seo', $caller);
     }
 
     /** @return array<string, mixed> */

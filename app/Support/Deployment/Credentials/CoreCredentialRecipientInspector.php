@@ -31,6 +31,9 @@ final class CoreCredentialRecipientInspector
     /**
      * @param array<string, mixed> $deploymentPlan Existing Core deployment-plan JSON shape
      * @param mixed $capabilityConfig Effective selected-client Forms/Donations configuration
+     * @param array<string, mixed> $persistedClientEnvironment Selected-client .env only
+     * @param array<string, mixed> $persistedRootEnvironment Root .env; only names are inspected
+     * @param array<int, mixed> $environmentIssues Redacted structure/parser findings
      * @return array<string, mixed> Redacted evidence; never an issuance authorization
      */
     public function inspect(
@@ -42,6 +45,9 @@ final class CoreCredentialRecipientInspector
         string $expectedEnvironment,
         array $deploymentPlan,
         mixed $capabilityConfig,
+        array $persistedClientEnvironment = [],
+        array $persistedRootEnvironment = [],
+        array $environmentIssues = [],
     ): array {
         $findings = [];
         $route = self::ROUTES[$purpose] ?? null;
@@ -70,6 +76,12 @@ final class CoreCredentialRecipientInspector
         $slotPresent = false;
         $secretPresent = false;
         $originMatch = null;
+
+        // The command supplies independently parsed selected-client/root files.
+        // A malformed or duplicate environment is never usable evidence.
+        if ($environmentIssues !== []) {
+            $findings[] = 'environment_file_integrity_invalid';
+        }
 
         if ($route !== null && in_array($sourcePlatform, $route['source_platforms'], true)) {
             $selection = $deploymentPlan['module_selection'] ?? null;
@@ -114,11 +126,39 @@ final class CoreCredentialRecipientInspector
                         if (! is_array($slot)) {
                             $findings[] = 'caller_slot_invalid';
                         } else {
-                            $secret = $slot['secret'] ?? null;
-                            $secretPresent = is_string($secret) && strlen($secret) >= 32
-                                && ($purpose !== 'forms.external_intake' || strlen($secret) <= 4096);
-
                             if ($purpose === 'donations.external_checkout') {
+                                // The Donations package consumer accepts only
+                                // the B14 caller-derived selected-client key.
+                                // Inline secrets or the legacy single-caller
+                                // shorthand do not establish runtime readiness.
+                                $expectedKey = CoreCredentialCallerKey::forCaller(
+                                    $purpose, $sourcePlatform, $callerId,
+                                );
+                                $declaredKey = $slot['secret_env_key'] ?? null;
+
+                                if (array_key_exists('secret', $slot) && $slot['secret'] !== null) {
+                                    $findings[] = 'unsupported_inline_signing_secret';
+                                }
+                                if ($expectedKey === null || ! is_string($declaredKey)
+                                    || $declaredKey !== $expectedKey
+                                ) {
+                                    $findings[] = 'caller_secret_binding_invalid';
+                                } else {
+                                    if (array_key_exists($expectedKey, $persistedRootEnvironment)) {
+                                        $findings[] = 'caller_secret_wrong_scope';
+                                    }
+                                    if (array_key_exists($expectedKey, $persistedClientEnvironment)) {
+                                        $value = $persistedClientEnvironment[$expectedKey];
+                                        if (! is_string($value)
+                                            || preg_match('/\A[A-Za-z0-9_-]{64}\z/D', $value) !== 1
+                                        ) {
+                                            $findings[] = 'caller_secret_invalid';
+                                        } else {
+                                            $secretPresent = true;
+                                        }
+                                    }
+                                }
+
                                 $configuredOrigin = $slot['site_origin'] ?? null;
                                 $originMatch = $this->validOrigin($configuredOrigin, $expectedEnvironment)
                                     && $configuredOrigin === $sourceOrigin;
@@ -126,8 +166,13 @@ final class CoreCredentialRecipientInspector
                                 if (! $originMatch) {
                                     $findings[] = 'caller_origin_mismatch';
                                 }
-                            } elseif (! $this->validFormsCallerMetadata($slot)) {
-                                $findings[] = 'caller_metadata_invalid';
+                            } else {
+                                $secret = $slot['secret'] ?? null;
+                                $secretPresent = is_string($secret) && strlen($secret) >= 32
+                                    && strlen($secret) <= 4096;
+                                if (! $this->validFormsCallerMetadata($slot)) {
+                                    $findings[] = 'caller_metadata_invalid';
+                                }
                             }
                         }
                     }

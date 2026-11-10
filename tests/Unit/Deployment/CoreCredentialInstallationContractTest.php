@@ -47,7 +47,7 @@ final class CoreCredentialInstallationContractTest extends TestCase
     public function test_enabled_but_unbound_caller_must_wait_for_owner_adapter(): void
     {
         $result = $this->inspect('donations.external_checkout', $this->donationsSlot());
-        $this->assertBlocked($result, 'owner_runtime_binding_not_declared');
+        $this->assertBlocked($result, 'caller_secret_binding_invalid');
         self::assertFalse($result['delivery_allowed']);
         self::assertFalse($result['runtime_binding_verified']);
     }
@@ -71,27 +71,27 @@ final class CoreCredentialInstallationContractTest extends TestCase
         $config['clients']['site_one']['secret_env_key'] = (new CoreCredentialInstallationContract())->keyFor(
             'donations.external_checkout', 'seo', 'another_site'
         );
-        $this->assertBlocked($this->inspect('donations.external_checkout', $config), 'owner_runtime_binding_mismatch');
+        $this->assertBlocked($this->inspect('donations.external_checkout', $config), 'caller_secret_binding_invalid');
     }
 
-    public function test_existing_legacy_secret_is_preserved_without_forcing_new_environment_key(): void
+    public function test_inline_donations_secret_is_rejected_without_forcing_a_new_credential(): void
     {
         $config = $this->donationsSlot();
         $config['clients']['site_one']['secret'] = self::SECRET;
         $result = $this->inspect('donations.external_checkout', $config);
-        self::assertSame('existing_secret_unverified', $result['status']);
+        $this->assertBlocked($result, 'unsupported_inline_signing_secret');
         self::assertNull($result['candidate_client_environment_key']);
         self::assertFalse($result['credential_equality_verified']);
     }
 
-    public function test_existing_legacy_secret_and_new_binding_cannot_be_combined_silently(): void
+    public function test_inline_and_environment_donations_bindings_cannot_be_combined(): void
     {
         $config = $this->donationsSlot();
         $config['clients']['site_one']['secret'] = self::SECRET;
         $config['clients']['site_one']['secret_env_key'] = (new CoreCredentialInstallationContract())->keyFor(
             'donations.external_checkout', 'seo', 'site_one'
         );
-        $this->assertBlocked($this->inspect('donations.external_checkout', $config), 'existing_secret_binding_requires_reconciliation');
+        $this->assertBlocked($this->inspect('donations.external_checkout', $config), 'unsupported_inline_signing_secret');
     }
 
     public function test_present_persisted_value_is_unverified_not_safe_to_replace(): void
@@ -110,8 +110,37 @@ final class CoreCredentialInstallationContractTest extends TestCase
         $config = $this->donationsSlot();
         $config['clients']['site_one']['secret_env_key'] = $key;
         $result = $this->inspect('donations.external_checkout', $config, [$key => 'secret-injection=value']);
-        $this->assertBlocked($result, 'existing_internal_credential_invalid');
+        $this->assertBlocked($result, 'caller_secret_invalid');
         self::assertStringNotContainsString('secret-injection', json_encode($result, JSON_THROW_ON_ERROR));
+    }
+
+    public function test_root_scope_value_and_environment_integrity_block_recipient(): void
+    {
+        $key = (new CoreCredentialInstallationContract())->keyFor('donations.external_checkout', 'seo', 'site_one');
+        $config = $this->donationsSlot();
+        $config['clients']['site_one']['secret_env_key'] = $key;
+        $contract = new CoreCredentialInstallationContract();
+        $base = [
+            'purpose' => 'donations.external_checkout',
+            'sourcePlatform' => 'seo',
+            'callerId' => 'site_one',
+            'sourceOrigin' => 'https://nonprofit.example',
+            'expectedClient' => 'example-core',
+            'expectedEnvironment' => 'staging',
+            'deploymentPlan' => $this->plan('donations'),
+            'capabilityConfig' => $config,
+            'persistedClientEnvironment' => [],
+        ];
+
+        $wrongScope = $contract->inspect(...array_merge($base, [
+            'persistedRootEnvironment' => [$key => str_repeat('A', 64)],
+        ]));
+        $this->assertBlocked($wrongScope, 'caller_secret_wrong_scope');
+
+        $broken = $contract->inspect(...array_merge($base, [
+            'environmentIssues' => [['code' => 'duplicate_environment_key']],
+        ]));
+        $this->assertBlocked($broken, 'environment_file_integrity_invalid');
     }
 
     public function test_different_selected_environment_does_not_authorize_same_key_material(): void
