@@ -52,6 +52,7 @@ final class CoreCredentialInstallationContract
         $status = $recipient['status'];
         $candidateKey = null;
         $bindingDeclared = false;
+        $ownerRequirementVerified = false;
 
         if ($status === 'needs_provisioning' || $status === 'configured_unverified') {
             if (! $recipient['caller_slot_present']) {
@@ -65,16 +66,18 @@ final class CoreCredentialInstallationContract
                 $slot = $capabilityConfig['clients'][$callerId];
                 $candidateKey = $this->keyFor($purpose, $sourcePlatform, $callerId);
 
-                // Existing explicit/legacy client secrets retain their current
-                // runtime representation. Never force a migration or assume
-                // the controller store owns that material.
+                // Never infer a package's runtime consumer from a candidate
+                // key alone. Donations declares one exact per-caller binding;
+                // Forms is still waiting for its owner-owned consumer.
                 $declared = $slot['secret_env_key'] ?? null;
                 $hasCandidateValue = $candidateKey !== null
                     && array_key_exists($candidateKey, $persistedClientEnvironment);
 
                 if ($recipient['secret_present']) {
                     $status = 'existing_secret_unverified';
-                    $candidateKey = null;
+                    if ($purpose !== 'donations.external_checkout') {
+                        $candidateKey = null;
+                    }
                     // Donations' package consumer (B15) reads the selected-client
                     // per-caller key, not an inline 'secret' value.
                     if ($purpose === 'donations.external_checkout') {
@@ -114,15 +117,38 @@ final class CoreCredentialInstallationContract
             }
         }
 
+        // B15 supplies Donations' actual runtime consumer and B18 supplies
+        // its active package-owned requirement. An installation target is
+        // recognized only when BOTH agree with the selected caller slot and
+        // Core's resolved deployment plan. This is still read-only evidence,
+        // not approval for Infrastructure to write into a recipient runtime.
+        if ($purpose === 'donations.external_checkout'
+            && $candidateKey !== null
+            && $bindingDeclared
+            && $findings === []
+        ) {
+            $ownerRequirementVerified = $this->donationsRequirementMatches(
+                $deploymentPlan,
+                $candidateKey,
+                $expectedClient,
+                array_key_exists($candidateKey, $persistedClientEnvironment),
+            );
+            if (! $ownerRequirementVerified) {
+                $findings[] = 'owner_environment_requirement_invalid';
+            }
+        }
+
         $findings = array_values(array_unique($findings));
         if ($findings !== []) {
             $status = 'blocked';
         } elseif ($status === 'needs_provisioning') {
-            $status = 'pending_owner_runtime_support';
+            $status = $ownerRequirementVerified
+                ? 'pending_delivery'
+                : 'pending_owner_runtime_support';
         }
 
-        // The contract intentionally does not expose an install-ready flag:
-        // capability consumers must first implement and verify the binding.
+        // Runtime load and credential equality are separate post-delivery
+        // checks. A recognized target never grants permission to write.
         return [
             'schema' => 1,
             'platform' => 'core',
@@ -137,12 +163,51 @@ final class CoreCredentialInstallationContract
                 ? null : $candidateKey,
             'caller_slot_declared' => (bool) $recipient['caller_slot_present'],
             'owner_binding_declared' => $bindingDeclared,
+            'owner_requirement_verified' => $status !== 'blocked' && $ownerRequirementVerified,
+            'installation_target_recognized' => $status !== 'blocked' && $ownerRequirementVerified,
             'findings' => $findings,
             'runtime_binding_verified' => false,
             'credential_equality_verified' => false,
             'delivery_allowed' => false,
             'writes_allowed' => false,
         ];
+    }
+
+    /**
+     * Confirm the active Donations package contributed its exact required
+     * client-scoped secret definition for this caller, not merely the legacy
+     * static catalog ownership entries or an operator-proposed key.
+     *
+     * @param array<string, mixed> $deploymentPlan
+     */
+    private function donationsRequirementMatches(
+        array $deploymentPlan,
+        string $key,
+        string $client,
+        bool $persisted,
+    ): bool {
+        $requirements = $deploymentPlan['environment_requirements'] ?? null;
+        if (! is_array($requirements) || ! array_is_list($requirements)) {
+            return false;
+        }
+
+        $matches = array_values(array_filter(
+            $requirements,
+            static fn (mixed $item): bool => is_array($item)
+                && ($item['key'] ?? null) === $key,
+        ));
+        if (count($matches) !== 1) {
+            return false;
+        }
+
+        $definition = $matches[0];
+        return ($definition['owner'] ?? null) === 'donations'
+            && ($definition['scope'] ?? null) === 'client'
+            && ($definition['secret'] ?? null) === true
+            && ($definition['requirement'] ?? null) === 'required'
+            && ($definition['target_path'] ?? null) === 'client/'.$client.'/.env'
+            && ($definition['persisted'] ?? null) === $persisted
+            && ($definition['status'] ?? null) === ($persisted ? 'ready' : 'missing');
     }
 
     /**

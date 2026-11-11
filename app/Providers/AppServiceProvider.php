@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Console\Commands\EngageDeploymentPlanCommand;
 use App\Console\Commands\EngageEnvironmentSyncCommand;
 use App\Console\Commands\InspectCoreCredentialRecipientCommand;
+use App\Console\Commands\InspectCoreCredentialInstallationCommand;
 use App\Console\Commands\InspectCoreEndpointOriginCommand;
 use App\Console\Commands\ModuleMigrationPreflightCommand;
 use App\Console\Commands\SyncPresetsCommand;
@@ -485,6 +486,7 @@ class AppServiceProvider extends ServiceProvider
                 EngageDeploymentPlanCommand::class,
                 EngageEnvironmentSyncCommand::class,
                 InspectCoreCredentialRecipientCommand::class,
+                InspectCoreCredentialInstallationCommand::class,
                 InspectCoreEndpointOriginCommand::class,
                 ModuleMigrationPreflightCommand::class,
                 SyncPresetsCommand::class,

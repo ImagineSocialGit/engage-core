@@ -52,13 +52,16 @@ final class CoreCredentialInstallationContractTest extends TestCase
         self::assertFalse($result['runtime_binding_verified']);
     }
 
-    public function test_declared_per_caller_binding_is_a_candidate_not_permission_to_write(): void
+    public function test_donations_bound_and_required_caller_is_pending_delivery_without_write_permission(): void
     {
         $key = (new CoreCredentialInstallationContract())->keyFor('donations.external_checkout', 'seo', 'site_one');
         $config = $this->donationsSlot();
         $config['clients']['site_one']['secret_env_key'] = $key;
         $result = $this->inspect('donations.external_checkout', $config);
-        self::assertSame('pending_owner_runtime_support', $result['status']);
+        self::assertSame('pending_delivery', $result['status']);
+        self::assertTrue($result['owner_requirement_verified']);
+        self::assertTrue($result['installation_target_recognized']);
+        self::assertFalse($result['delivery_allowed']);
         self::assertSame($key, $result['candidate_client_environment_key']);
         self::assertTrue($result['owner_binding_declared']);
         self::assertFalse($result['delivery_allowed']);
@@ -216,10 +219,125 @@ final class CoreCredentialInstallationContractTest extends TestCase
         ]];
     }
 
+    public function test_missing_package_owned_requirement_never_recognizes_donations_target(): void
+    {
+        $plan = $this->plan('donations');
+        array_pop($plan['environment_requirements']);
+        $config = $this->boundDonationsSlot();
+        $result = $this->inspect('donations.external_checkout', $config, [], $plan);
+        $this->assertBlocked($result, 'owner_environment_requirement_invalid');
+        self::assertFalse($result['installation_target_recognized']);
+        self::assertNull($result['candidate_client_environment_key']);
+    }
+
+    public function test_wrong_owner_scope_secrecy_or_optional_requirement_blocks(): void
+    {
+        foreach ([
+            ['owner', 'core'],
+            ['scope', 'root'],
+            ['secret', false],
+            ['requirement', 'optional'],
+            ['target_path', 'client/unrelated-core/.env'],
+            ['status', 'ready'],
+            ['persisted', true],
+        ] as [$field, $value]) {
+            $plan = $this->plan('donations');
+            $plan['environment_requirements'][2][$field] = $value;
+            $this->assertBlocked(
+                $this->inspect('donations.external_checkout', $this->boundDonationsSlot(), [], $plan),
+                'owner_environment_requirement_invalid',
+            );
+        }
+    }
+
+    public function test_duplicate_requirement_blocks_even_when_both_entries_match(): void
+    {
+        $plan = $this->plan('donations');
+        $plan['environment_requirements'][] = $plan['environment_requirements'][2];
+        $this->assertBlocked(
+            $this->inspect('donations.external_checkout', $this->boundDonationsSlot(), [], $plan),
+            'owner_environment_requirement_invalid',
+        );
+    }
+
+    public function test_stale_missing_plan_for_existing_secret_cannot_authorize_target(): void
+    {
+        $key = (new CoreCredentialInstallationContract())->keyFor('donations.external_checkout', 'seo', 'site_one');
+        $result = $this->inspect(
+            'donations.external_checkout',
+            $this->boundDonationsSlot(),
+            [$key => str_repeat('K', 64)],
+            $this->plan('donations'),
+        );
+        $this->assertBlocked($result, 'owner_environment_requirement_invalid');
+        self::assertFalse($result['delivery_allowed']);
+    }
+
+    public function test_existing_matching_client_secret_remains_unverified_not_new_install(): void
+    {
+        $key = (new CoreCredentialInstallationContract())->keyFor('donations.external_checkout', 'seo', 'site_one');
+        $result = $this->inspect('donations.external_checkout', $this->boundDonationsSlot(), [$key => str_repeat('K', 64)]);
+        self::assertSame('existing_secret_unverified', $result['status']);
+        self::assertSame($key, $result['candidate_client_environment_key']);
+        self::assertTrue($result['installation_target_recognized']);
+        self::assertFalse($result['runtime_binding_verified']);
+        self::assertFalse($result['credential_equality_verified']);
+        self::assertFalse($result['delivery_allowed']);
+    }
+
+    public function test_another_caller_cannot_use_a_different_slot_required_key(): void
+    {
+        $plan = $this->plan('donations');
+        $plan['environment_requirements'][2]['key'] = (new CoreCredentialInstallationContract())->keyFor(
+            'donations.external_checkout', 'seo', 'someone_else',
+        );
+        $this->assertBlocked(
+            $this->inspect('donations.external_checkout', $this->boundDonationsSlot(), [], $plan),
+            'owner_environment_requirement_invalid',
+        );
+    }
+
+    public function test_forms_still_awaits_its_own_runtime_consumer(): void
+    {
+        $key = (new CoreCredentialInstallationContract())->keyFor('forms.external_intake', 'seo', 'site_one');
+        $result = $this->inspect('forms.external_intake', [
+            'enabled' => true,
+            'clients' => ['site_one' => [
+                'secret_env_key' => $key,
+                'source' => 'seo-site',
+                'provider' => 'site_one',
+                'allowed_forms' => ['contact'],
+            ]],
+        ]);
+        self::assertSame('pending_owner_runtime_support', $result['status']);
+        self::assertFalse($result['installation_target_recognized']);
+    }
+
+    /** @return array<string, mixed> */
+    private function boundDonationsSlot(): array
+    {
+        $config = $this->donationsSlot();
+        $config['clients']['site_one']['secret_env_key'] = (new CoreCredentialInstallationContract())->keyFor(
+            'donations.external_checkout', 'seo', 'site_one',
+        );
+        return $config;
+    }
+
     /** @param array<string, mixed> $config @param array<string, mixed> $env @param array<string, mixed>|null $plan */
     private function inspect(string $purpose, array $config, array $env = [], ?array $plan = null, string $environment = 'staging'): array
     {
+        $defaultPlan = $plan === null;
         $plan ??= $this->plan($purpose === 'forms.external_intake' ? 'forms' : 'donations', $environment);
+        if ($defaultPlan && $purpose === 'donations.external_checkout') {
+            $key = (new CoreCredentialInstallationContract())->keyFor($purpose, 'seo', 'site_one');
+            foreach ($plan['environment_requirements'] as &$requirement) {
+                if ($requirement['key'] === $key) {
+                    $requirement['status'] = array_key_exists($key, $env) ? 'ready' : 'missing';
+                    $requirement['persisted'] = array_key_exists($key, $env);
+                }
+            }
+            unset($requirement);
+        }
         return (new CoreCredentialInstallationContract())->inspect(
             purpose: $purpose,
             sourcePlatform: 'seo',
@@ -253,6 +371,16 @@ final class CoreCredentialInstallationContractTest extends TestCase
             'environment_requirements' => [
                 ['key' => $keys[0], 'scope' => 'client', 'owner' => $module, 'secret' => false, 'requirement' => 'optional'],
                 ['key' => $keys[1], 'scope' => 'client', 'owner' => $module, 'secret' => true, 'requirement' => 'optional'],
+                ...($module === 'donations' ? [[
+                    'key' => (new CoreCredentialInstallationContract())->keyFor('donations.external_checkout', 'seo', 'site_one'),
+                    'scope' => 'client',
+                    'owner' => 'donations',
+                    'secret' => true,
+                    'requirement' => 'required',
+                    'target_path' => 'client/example-core/.env',
+                    'status' => 'missing',
+                    'persisted' => false,
+                ]] : []),
             ],
         ];
     }
