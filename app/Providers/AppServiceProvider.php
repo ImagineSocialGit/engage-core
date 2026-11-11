@@ -7,6 +7,9 @@ use App\Console\Commands\EngageEnvironmentSyncCommand;
 use App\Console\Commands\InspectCoreCredentialRecipientCommand;
 use App\Console\Commands\InspectCoreCredentialInstallationCommand;
 use App\Console\Commands\InspectCoreEndpointOriginCommand;
+use App\Console\Commands\InspectCoreCredentialRuntimeCommand;
+use App\Support\Deployment\Credentials\CoreCredentialRuntimeContributor;
+use App\Support\Deployment\Credentials\CoreCredentialRuntimeProbe;
 use App\Console\Commands\ModuleMigrationPreflightCommand;
 use App\Console\Commands\SyncPresetsCommand;
 use App\Console\Commands\ValidateSetupCommand;
@@ -93,6 +96,10 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->app->singleton(CoreCredentialRuntimeProbe::class, fn ($app): CoreCredentialRuntimeProbe => new CoreCredentialRuntimeProbe(
+            contributors: $app->tagged(CoreCredentialRuntimeContributor::TAG),
+        ));
+
         $this->app->singleton(ModuleManager::class);
         $this->app->singleton(EnvironmentFileRepository::class);
         $this->app->singleton(EnvironmentFileSynchronizer::class);
@@ -488,6 +495,7 @@ class AppServiceProvider extends ServiceProvider
                 InspectCoreCredentialRecipientCommand::class,
                 InspectCoreCredentialInstallationCommand::class,
                 InspectCoreEndpointOriginCommand::class,
+                InspectCoreCredentialRuntimeCommand::class,
                 ModuleMigrationPreflightCommand::class,
                 SyncPresetsCommand::class,
                 ValidateSetupCommand::class,
