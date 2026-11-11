@@ -8,6 +8,7 @@ use App\Console\Commands\InspectCoreCredentialRecipientCommand;
 use App\Console\Commands\InspectCoreCredentialInstallationCommand;
 use App\Console\Commands\InspectCoreEndpointOriginCommand;
 use App\Console\Commands\InspectCoreCredentialRuntimeCommand;
+use App\Console\Commands\InspectCoreCredentialCallerCommand;
 use App\Support\Deployment\Credentials\CoreCredentialRuntimeContributor;
 use App\Support\Deployment\Credentials\CoreCredentialRuntimeProbe;
 use App\Console\Commands\ModuleMigrationPreflightCommand;
@@ -496,6 +497,7 @@ class AppServiceProvider extends ServiceProvider
                 InspectCoreCredentialInstallationCommand::class,
                 InspectCoreEndpointOriginCommand::class,
                 InspectCoreCredentialRuntimeCommand::class,
+                InspectCoreCredentialCallerCommand::class,
                 ModuleMigrationPreflightCommand::class,
                 SyncPresetsCommand::class,
                 ValidateSetupCommand::class,

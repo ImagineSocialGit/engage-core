@@ -3,19 +3,39 @@
 namespace App\Modules\Core\Deployment;
 
 use App\Support\Deployment\Contracts\DeploymentPlanContributor;
+use App\Support\Deployment\Contracts\DeploymentEnvironmentDefinitionContributor;
+use App\Support\Deployment\Credentials\CoreInternalCallerRegistry;
+use App\Support\Environment\Data\EnvironmentVariableDefinition;
 use App\Support\Deployment\Contracts\DeploymentSetupContributor;
 use App\Support\Deployment\Data\DeploymentSetupStep;
 use App\Support\Deployment\Data\EnvironmentRequirement;
 
-final class CoreDeploymentPlanContributor implements DeploymentPlanContributor, DeploymentSetupContributor
+final class CoreDeploymentPlanContributor implements DeploymentPlanContributor, DeploymentSetupContributor, DeploymentEnvironmentDefinitionContributor
 {
     public function owner(): string
     {
         return 'core';
     }
 
+    public function environmentDefinitions(): iterable
+    {
+        // Runtime metadata is declared through Core's existing dynamic catalog;
+        // reference .env templates remain independent of generated caller state.
+        yield new EnvironmentVariableDefinition(
+            key: CoreInternalCallerRegistry::ENVIRONMENT_KEY,
+            scope: EnvironmentVariableDefinition::SCOPE_CLIENT,
+            owner: $this->owner(),
+            secret: false,
+        );
+    }
+
     public function environmentRequirements(): iterable
     {
+        yield EnvironmentRequirement::optional(
+            CoreInternalCallerRegistry::ENVIRONMENT_KEY,
+            'Deployment-owned internal caller metadata; packages declare and consume their own supported connections.',
+        );
+
         // Runtime identity and encryption must always be explicit.
         yield EnvironmentRequirement::required(
             'APP_ENV',

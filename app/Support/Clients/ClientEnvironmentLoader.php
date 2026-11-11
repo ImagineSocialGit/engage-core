@@ -9,7 +9,7 @@ use RuntimeException;
 
 final class ClientEnvironmentLoader
 {
-    public function load(string $basePath): void
+    public function load(string $basePath, bool $deferUnknownKeys = false): void
     {
         $clientKey = $this->clientKey();
 
@@ -55,23 +55,37 @@ final class ClientEnvironmentLoader
             '.env',
         )->safeLoad();
 
-        $unsupportedKeys = array_values(array_diff(
-            array_keys($values),
-            self::clientOwnedKeys(),
-        ));
+        $allowed = self::clientOwnedKeys();
+        $unsupportedKeys = array_values(array_diff(array_keys($values), $allowed));
 
-        sort($unsupportedKeys);
+        // During early bootstrap only statically owned values can be injected.
+        // Root-owned keys are always invalid, even in the deferred pass. Unknown
+        // values remain private in this local map until strict post-registration
+        // ownership validation; they never become process environment inputs.
+        if ($deferUnknownKeys) {
+            $rootOwned = EnvironmentVariableCatalog::rootOwnedKeys();
+            $rejected = array_values(array_intersect($unsupportedKeys, $rootOwned));
+        } else {
+            $rejected = $unsupportedKeys;
+        }
 
-        if ($unsupportedKeys !== []) {
+        sort($rejected);
+
+        if ($rejected !== []) {
             throw new RuntimeException(sprintf(
                 'Client environment [%s] contains root-owned or unsupported key(s): %s.',
                 $environmentPath,
-                implode(', ', $unsupportedKeys),
+                implode(', ', $rejected),
             ));
         }
 
         foreach ($values as $key => $value) {
-            $this->setEnvironmentValue($key, $value);
+            if (in_array($key, $allowed, true)) {
+                $this->setEnvironmentValue($key, $value);
+            } else {
+                // A stale inherited unknown value must not act as a fallback.
+                $this->clearEnvironmentValue($key);
+            }
         }
     }
 

@@ -170,7 +170,16 @@ $app->afterLoadingEnvironment(function () use ($app): void {
         return;
     }
 
-    (new ClientEnvironmentLoader())->load($app->basePath());
+    (new ClientEnvironmentLoader())->load($app->basePath(), deferUnknownKeys: true);
+});
+
+// All enabled module/package providers have registered their ownership
+// contributors before booting callbacks run. This strict pass is mandatory,
+// including cached runtimes, and happens before any provider boot method.
+$app->booting(function () use ($app): void {
+    if (! $app->environment('testing')) {
+        (new ClientEnvironmentLoader())->load($app->basePath());
+    }
 });
 
 return $app;
