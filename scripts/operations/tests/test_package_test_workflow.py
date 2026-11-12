@@ -6,6 +6,8 @@ from pathlib import Path
 import tempfile
 import unittest
 import subprocess
+from unittest import mock
+from argparse import Namespace
 
 MODULE_PATH = Path(__file__).resolve().parents[1] / "lib" / "package_test_workflow.py"
 SPEC = importlib.util.spec_from_file_location("package_test_workflow", MODULE_PATH)
@@ -150,6 +152,115 @@ return $loader;
                          test=[], dry_run=True, phpunit_args=[])
         self.assertEqual(0, runner.run_tests(args))
 
+
+    def make_core_vertical_package(self):
+        package = self.workspace / "engage-fixture-vertical"
+        (package / "src").mkdir(parents=True)
+        (package / "tests" / "Feature").mkdir(parents=True)
+        (package / "tests" / "Feature" / "FixtureTest.php").write_text("<?php\n")
+        (package / "database" / "migrations").mkdir(parents=True)
+        (package / "database" / "migrations" / "2099_01_01_000000_create_fixture_records.php").write_text("<?php\n")
+        composer = {
+            "name": "imagine-social/engage-fixture-vertical",
+            "autoload": {"psr-4": {"ImagineSocial\\FixtureVertical\\": "src/"}},
+        }
+        (package / "composer.json").write_text(json.dumps(composer))
+        (package / "engage-package.json").write_text(json.dumps({
+            "schema": 1,
+            "name": composer["name"],
+            "kind": "vertical",
+            "platform": "core",
+            "namespace": "ImagineSocial\\FixtureVertical",
+            "module_key": "fixture_vertical",
+            "module_class": "ImagineSocial\\FixtureVertical\\FixtureVerticalPackage",
+            "migration_scope": True,
+        }))
+        return package, composer
+
+    def test_core_package_bootstrap_registers_source_module_and_migrations_without_client(self):
+        package, composer = self.make_core_vertical_package()
+        statements = runner.core_package_registration(package, composer)
+        bootstrap = runner.build_bootstrap(self.host, package, composer, platform="core")
+        self.assertIn("ClientPackageRuntime::replace", bootstrap)
+        self.assertIn("FixtureVerticalPackage", bootstrap)
+        self.assertIn("fixture_vertical", bootstrap)
+        self.assertIn(str(package / "database" / "migrations"), bootstrap)
+        self.assertNotIn("client/", bootstrap)
+        self.assertNotIn("holly-hatcher", bootstrap)
+        self.assertTrue(statements)
+        generated = self.workspace / "core-bootstrap.php"
+        generated.write_text(bootstrap)
+        lint = subprocess.run(["php", "-l", str(generated)], capture_output=True, text=True)
+        self.assertEqual(0, lint.returncode, lint.stderr)
+
+    def test_vertical_test_registration_rejects_missing_migrations_and_descriptor_drift(self):
+        package, composer = self.make_core_vertical_package()
+        migrations = package / "database" / "migrations"
+        next(migrations.glob("*.php")).unlink()
+        with self.assertRaises(runner.PackageTestError):
+            runner.core_package_registration(package, composer)
+        (migrations / "2099_01_01_000000_create_fixture_records.php").write_text("<?php\n")
+        descriptor = json.loads((package / "engage-package.json").read_text())
+        descriptor["module_class"] = "Foreign\\Module"
+        (package / "engage-package.json").write_text(json.dumps(descriptor))
+        with self.assertRaises(runner.PackageTestError):
+            runner.core_package_registration(package, composer)
+        descriptor["module_class"] = "ImagineSocial\\FixtureVertical\\FixtureVerticalPackage"
+        descriptor["name"] = "imagine-social/another-package"
+        (package / "engage-package.json").write_text(json.dumps(descriptor))
+        with self.assertRaises(runner.PackageTestError):
+            runner.core_package_registration(package, composer)
+
+    def test_package_test_run_activates_only_package_owned_modules_and_clears_client(self):
+        package, _ = self.make_core_vertical_package()
+        core = self.workspace / "engage-core"
+        (core / "vendor" / "bin").mkdir(parents=True)
+        (core / "vendor" / "autoload.php").write_text("<?php\n")
+        (core / "vendor" / "bin" / "phpunit").write_text("placeholder")
+        (core / "phpunit.xml").write_text("<phpunit/>")
+        (core / "artisan").write_text("placeholder")
+        args = Namespace(package=package.name, platform="core", workspace=str(self.workspace),
+                         configuration=None, test=[], dry_run=False, phpunit_args=[])
+        observed = {}
+        def fake_phpunit_run(command, cwd, env, check):
+            observed["env"] = env.copy()
+            observed["code"] = Path(command[command.index("--bootstrap") + 1]).read_text()
+            return type("Result", (), {"returncode": 0})()
+        with mock.patch.object(runner.subprocess, "run", side_effect=fake_phpunit_run):
+            self.assertEqual(0, runner.run_tests(args))
+        self.assertEqual("testing", observed["env"]["APP_ENV"])
+        self.assertEqual("", observed["env"]["CLIENT_KEY"])
+        self.assertEqual("fixture_vertical", observed["env"]["ENGAGE_PACKAGE_TEST_MODULES"])
+        self.assertIn("ClientPackageRuntime::replace", observed["code"])
+        self.assertNotIn("client/holly-hatcher", observed["code"])
+
+    def test_cached_host_configuration_blocks_neutral_package_test_run(self):
+        package, _ = self.make_core_vertical_package()
+        core = self.workspace / "engage-core"
+        (core / "vendor" / "bin").mkdir(parents=True)
+        (core / "vendor" / "autoload.php").write_text("<?php\n")
+        (core / "vendor" / "bin" / "phpunit").write_text("placeholder")
+        (core / "phpunit.xml").write_text("<phpunit/>")
+        (core / "artisan").write_text("placeholder")
+        (core / "bootstrap" / "cache").mkdir(parents=True)
+        (core / "bootstrap" / "cache" / "config.php").write_text("<?php\n")
+        args = Namespace(package=package.name, platform="core", workspace=str(self.workspace),
+                         configuration=None, test=[], dry_run=False, phpunit_args=[])
+        with mock.patch.object(runner.subprocess, "run", side_effect=AssertionError("must not execute")):
+            with self.assertRaises(runner.PackageTestError):
+                runner.run_tests(args)
+
+    def test_client_config_test_host_ignores_real_client_key(self):
+        config = Path(__file__).resolve().parents[3] / "config" / "client.php"
+        source = r"""function env($key, $default = null) { $value = getenv($key); return $value === false ? $default : $value; }
+function base_path($path) { return '/neutral-host/'.$path; }
+$result = require $argv[1];
+if ($result['key'] !== 'default' || $result['config_path'] !== null || $result['views_path'] !== null || $result['env_path'] !== null) { exit(1); }
+"""
+        result = subprocess.run(["php", "-r", source, str(config)],
+                                env={"APP_ENV": "testing", "CLIENT_KEY": "holly-hatcher-ef-core"},
+                                capture_output=True, text=True)
+        self.assertEqual(0, result.returncode, result.stderr)
 
 if __name__ == "__main__":
     unittest.main()

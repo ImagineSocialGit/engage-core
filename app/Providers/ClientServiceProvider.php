@@ -16,6 +16,7 @@ class ClientServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->mergeClientConfig();
+        $this->enableExplicitTestPackageModules();
 
         foreach (ClientPackageRuntime::manifest()->providers() as $provider) {
             $this->app->register($provider);
@@ -30,6 +31,42 @@ class ClientServiceProvider extends ServiceProvider
             View::prependLocation($views);
             View::prependNamespace('client', $views);
         }
+    }
+
+    /**
+     * The standalone package runner activates only modules declared by the
+     * package under test. A normal test bootstrap has no package activation.
+     * Never allow this test-only request outside the testing environment.
+     */
+    private function enableExplicitTestPackageModules(): void
+    {
+        if (! $this->app->environment('testing')) {
+            return;
+        }
+
+        $requested = getenv('ENGAGE_PACKAGE_TEST_MODULES');
+
+        if (! is_string($requested) || $requested === '') {
+            return;
+        }
+
+        $keys = explode(',', $requested);
+        $available = array_keys(ClientPackageRuntime::manifest()->moduleDefinitions());
+
+        if (in_array('', $keys, true)
+            || count($keys) !== count(array_unique($keys))
+            || array_diff($keys, $available) !== []
+        ) {
+            throw new \RuntimeException('Standalone package test module selection is invalid.');
+        }
+
+        $enabled = config('modules.enabled', []);
+        $enabled = is_array($enabled) ? $enabled : [];
+
+        config()->set('modules.enabled', array_values(array_unique([
+            ...$enabled,
+            ...$keys,
+        ])));
     }
 
     private function mergeClientConfig(): void

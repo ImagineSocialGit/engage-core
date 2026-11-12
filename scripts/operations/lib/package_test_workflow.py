@@ -119,7 +119,103 @@ def mappings(composer: dict, directory: Path) -> tuple[list[tuple[str, Path]], l
     return namespaces, files
 
 
-def build_bootstrap(host: Path, package: Path, composer: dict) -> str:
+def core_package_registration(package: Path, composer: dict) -> list[str]:
+    """Register one package's Core test contributions, never a real client.
+
+    The source-owned descriptor is the same contract used by package.sh for
+    managed client registration. Only module/provider identities and the
+    package's own migration directory enter this ephemeral test manifest.
+    """
+    descriptor_path = package / "engage-package.json"
+    if not descriptor_path.is_file():
+        # Legacy/library packages without descriptors remain class-testable.
+        return []
+    descriptor = json_object(descriptor_path)
+    if descriptor.get("schema") != 1 or descriptor.get("name") != composer.get("name"):
+        fail("Package test descriptor schema/name must match composer.json.")
+    if descriptor.get("platform", "core") != "core":
+        fail("Cannot register a non-Core package as a Core test package.")
+    kind = descriptor.get("kind")
+    if kind not in ("integration", "vertical", "vertical-group", "library"):
+        fail("Unsupported Core package test descriptor kind.")
+    prefix = descriptor.get("namespace")
+    psr4 = composer.get("autoload", {}).get("psr-4", {})
+    if not isinstance(prefix, str) or not isinstance(psr4, dict) or prefix + "\\" not in psr4:
+        fail("Package test descriptor namespace must be owned by Composer autoload.")
+
+    entries: list[tuple[str, str, Path | None]] = []
+    if kind == "vertical":
+        entries = [(descriptor.get("module_key"), descriptor.get("module_class"),
+                    package / "database" / "migrations" if descriptor.get("migration_scope") else None)]
+    elif kind == "vertical-group":
+        records = descriptor.get("modules")
+        if not isinstance(records, list) or len(records) < 2:
+            fail("Core vertical group must declare multiple test module contributions.")
+        for record in records:
+            if not isinstance(record, dict):
+                fail("Invalid Core vertical group test module definition.")
+            entries.append((record.get("module_key"), record.get("module_class"),
+                            package / "database" / "migrations" / str(record.get("module_key"))
+                            if record.get("migration_scope") else None))
+
+    provider = descriptor.get("service_provider")
+    if kind == "integration" and provider is None:
+        fail("Core integration package must declare a service provider.")
+    if provider is not None and (not isinstance(provider, str) or not provider.startswith(prefix + "\\")):
+        fail("Core test package provider is not owned by its namespace.")
+    statements = [
+        "// Source-owned package registration for a neutral Core test runtime.",
+        "if (getenv('APP_ENV') !== 'testing') {",
+        "    throw new \\RuntimeException('Standalone package bootstrap requires APP_ENV=testing.');",
+        "}",
+        "$engageTestPackageModules = [];",
+        "$engageTestPackageMigrations = [];",
+        "$engageTestPackageProviders = [];",
+    ]
+    if provider is not None:
+        statements.extend([
+            f"$engageTestProvider = {php_string(provider)};",
+            "if (!is_subclass_of($engageTestProvider, \\Illuminate\\Support\\ServiceProvider::class)) {",
+            "    throw new \\RuntimeException('Package test provider is missing or invalid.');",
+            "}",
+            "$engageTestPackageProviders[] = $engageTestProvider;",
+        ])
+    seen: set[str] = set()
+    for key, cls, migration_dir in entries:
+        if not isinstance(key, str) or not re.fullmatch(r"[a-z][a-z0-9_]*", key) or key in seen:
+            fail("Core test package has an invalid or duplicate module key.")
+        if not isinstance(cls, str) or not cls.startswith(prefix + "\\") or not re.fullmatch(r"[A-Za-z0-9_\\]+", cls):
+            fail(f"Core test package module class for {key} is invalid.")
+        seen.add(key)
+        statements.extend([
+            f"$engageTestModule = {php_string(cls)};",
+            "if (!class_exists($engageTestModule)",
+            "    || !defined($engageTestModule.'::MODULE_KEY')",
+            f"    || $engageTestModule::MODULE_KEY !== {php_string(key)}) {{",
+            "    throw new \\RuntimeException('Package test module class/key mismatch.');",
+            "}",
+            f"$engageTestPackageModules[{php_string(key)}] = $engageTestModule::moduleDefinition();",
+        ])
+        if migration_dir is not None:
+            resolved = migration_dir.resolve()
+            if not resolved.is_relative_to(package) or not resolved.is_dir() or not list(resolved.glob("*.php")):
+                fail(f"Core test module {key} declares missing source migrations.")
+            statements.append(f"$engageTestPackageMigrations[{php_string(key)}] = ['path' => {php_string(str(resolved))}];")
+    if statements:
+        statements.extend([
+            "\\App\\Support\\Clients\\ClientPackageRuntime::replace(",
+            "    new \\App\\Support\\Clients\\ClientPackageManifest(",
+            "        providers: $engageTestPackageProviders,",
+            "        moduleDefinitions: $engageTestPackageModules,",
+            "        migrationScopes: $engageTestPackageMigrations,",
+            "    ),",
+            ");",
+        ])
+    return statements
+
+
+def build_bootstrap(host: Path, package: Path, composer: dict, *, platform: str | None = None) -> str:
+    platform = platform or resolve_platform(package, composer, "auto")
     namespaces, files = mappings(composer, package)
     host_autoload = host / "vendor" / "autoload.php"
     host_bootstrap = host / "tests" / "bootstrap.php"
@@ -149,6 +245,8 @@ def build_bootstrap(host: Path, package: Path, composer: dict) -> str:
         statements.append(f"$engageHostLoader->addPsr4({php_string(namespace)}, {php_string(str(path))}, true);")
     for file in files:
         statements.append(f"require_once {php_string(str(file))};")
+    if platform == "core":
+        statements.extend(core_package_registration(package, composer))
     if host_bootstrap.is_file():
         # SEO's bootstrap clears CLIENT_KEY and loads only .env.testing; it
         # must run after the package's classmap is registered and before tests.
@@ -191,7 +289,10 @@ def run_tests(args: argparse.Namespace) -> int:
     if not configuration.is_relative_to(host):
         fail("Use a PHPUnit configuration from the host platform, not the package/client.")
     targets = test_targets(package, args.test)
-    bootstrap_source = build_bootstrap(host, package, composer)
+    if (host / "bootstrap" / "cache" / "config.php").exists():
+        fail("Host config cache is present: neutral package tests require uncached host configuration. "
+             "Clear the cache in the local/test checkout before running tests.")
+    bootstrap_source = build_bootstrap(host, package, composer, platform=platform)
     command_display = ["php", str(phpunit), "--configuration", str(configuration),
                        "--bootstrap", "<temporary package bootstrap>", *(str(x) for x in targets),
                        *args.phpunit_args]
@@ -215,6 +316,16 @@ def run_tests(args: argparse.Namespace) -> int:
         environment = os.environ.copy()
         environment["APP_ENV"] = "testing"
         environment["CLIENT_KEY"] = ""
+        # Only activate modules owned by this package in its isolated suite.
+        # The registration itself comes from the source-owned descriptor.
+        environment.pop("ENGAGE_PACKAGE_TEST_MODULES", None)
+        if platform == "core" and (package / "engage-package.json").is_file():
+            descriptor = json_object(package / "engage-package.json")
+            modules = ([descriptor.get("module_key")] if descriptor.get("kind") == "vertical"
+                       else [item.get("module_key") for item in descriptor.get("modules", [])]
+                       if descriptor.get("kind") == "vertical-group" else [])
+            if modules:
+                environment["ENGAGE_PACKAGE_TEST_MODULES"] = ",".join(modules)
         # Do not force database credentials here. The host test config and
         # test bootstrap are authoritative for isolated test databases.
         try:

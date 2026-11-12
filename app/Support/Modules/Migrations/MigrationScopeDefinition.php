@@ -116,11 +116,22 @@ final readonly class MigrationScopeDefinition
 
         if ($pathKind === null) {
             throw new InvalidArgumentException(
-                "Migration scope [{$key}] path must be a normalized repository-relative directory under database/migrations or a selected-client package migration directory under client/{CLIENT_KEY}/vendor.",
+                "Migration scope [{$key}] path must be a normalized repository-relative directory under database/migrations or a selected-client package migration directory under client/{CLIENT_KEY}/vendor (or a canonical package source path during tests).",
             );
         }
 
-        $absolutePath = realpath(base_path($path));
+        // The canonical standalone-package test runner registers source checkout
+        // migrations directly, without selecting a client or installing its vendor.
+        // Absolute paths are never accepted outside the testing environment.
+        $absolutePath = realpath(
+            $pathKind === 'test_package' ? $path : base_path($path),
+        );
+
+        if ($pathKind === 'test_package' && $absolutePath !== $path) {
+            throw new InvalidArgumentException(
+                "Migration scope [{$key}] test package directory must be canonical.",
+            );
+        }
 
         if (! is_string($absolutePath) || ! is_dir($absolutePath)) {
             throw new InvalidArgumentException(
@@ -220,6 +231,16 @@ final readonly class MigrationScopeDefinition
             $path,
         ) === 1) {
             return 'client_package';
+        }
+
+        if (app()->environment('testing')
+            && str_starts_with($path, DIRECTORY_SEPARATOR)
+            && preg_match(
+                '~/(?:engage-[a-z0-9]+(?:-[a-z0-9]+)*)/database/migrations(?:/[a-z0-9_-]+)*$~D',
+                $path,
+            ) === 1
+        ) {
+            return 'test_package';
         }
 
         return null;

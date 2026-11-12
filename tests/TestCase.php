@@ -41,7 +41,9 @@ abstract class TestCase extends BaseTestCase
 
         foreach ($migrationPaths as $path) {
             $migrator->path(
-                $app->basePath($path),
+                str_starts_with($path, DIRECTORY_SEPARATOR)
+                    ? $path
+                    : $app->basePath($path),
             );
         }
 

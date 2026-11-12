@@ -1,6 +1,9 @@
 <?php
 
-$clientKey = env('CLIENT_KEY', 'default');
+// The neutral test host must never inherit a selected real client's source.
+// Tests that exercise client overrides explicitly supply their fixture path.
+$testing = env('APP_ENV') === 'testing';
+$clientKey = $testing ? 'default' : env('CLIENT_KEY', 'default');
 
 $clientPath = base_path('client/'.$clientKey);
 
@@ -8,9 +11,9 @@ return [
     'key' => $clientKey,
     'preset' => null,
     'path' => $clientPath,
-    'config_path' => $clientPath.'/config',
-    'views_path' => $clientPath.'/resources/views',
-    'env_path' => $clientPath.'/.env',
+    'config_path' => $testing ? null : $clientPath.'/config',
+    'views_path' => $testing ? null : $clientPath.'/resources/views',
+    'env_path' => $testing ? null : $clientPath.'/.env',
 
     'timezone' => 'UTC',
 
