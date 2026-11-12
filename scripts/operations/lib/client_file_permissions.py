@@ -2,8 +2,8 @@
 """Local Engage Core permission policy for selected-client runtime files.
 
 Developer owns files. PHP-FPM receives read/traverse access through its group.
-Only paths passed explicitly, managed package files, or the selected client config
-subtree are touched. Never changes ownership or recursively chowns a checkout.
+Only paths passed explicitly, the selected client root, managed package files,
+or the selected client config subtree are touched. Never changes ownership or recursively chowns a checkout.
 """
 
 from __future__ import annotations
@@ -88,6 +88,13 @@ def prepare(path: Path, kind: str, group_name: str, group_gid: int) -> None:
         error(f"Incorrect final permissions for {path}: expected group [{group_name}] mode {mode:04o}.")
 
 
+def verify_client_root(client: Path, group_gid: int) -> None:
+    details = inspect(client, "dir")
+    owned_by_developer(client, details)
+    if details.st_gid != group_gid or stat.S_IMODE(details.st_mode) != 0o2750:
+        error(f"Selected client directory {client} requires its authorized runtime group and mode 2750 for atomic-write group inheritance. Run the normal client preparation workflow.")
+
+
 def check_web_access(entries: list[tuple[Path, str]], user_name: str) -> None:
     """Check every path under the real PHP-FPM user in a single sudo invocation."""
     for path, kind in entries:
@@ -162,11 +169,11 @@ def main(argv: list[str]) -> int:
         entries = config_paths(client) if action.endswith("config") else managed_paths(client)
         if action.startswith("prepare"):
             for path, kind in entries:
-                # The client root is a developer-owned Git checkout, not a
-                # configuration directory. Verify access, never rewrite it.
-                if path == client:
-                    continue
-                prepare(path, kind, group_name, group_gid)
+                # The selected root also needs inheritance for atomic .env
+                # replacements. This touches that exact directory, never .git,
+                # Composer files or unrelated source below the checkout.
+                prepare(path, "dir" if path == client else kind, group_name, group_gid)
+        verify_client_root(client, group_gid)
         check_web_access(entries, web_user)
         if action.endswith("managed"):
             check_core_client_config(client, web_user)
@@ -174,7 +181,12 @@ def main(argv: list[str]) -> int:
         entries = [(Path(item).absolute(), "file") for item in args]
         if action == "prepare-env":
             for path, kind in entries:
+                if path.name == ".env" and path.parent.parent.name == "client":
+                    prepare(path.parent, "dir", group_name, group_gid)
                 prepare(path, kind, group_name, group_gid)
+        for path, _kind in entries:
+            if path.name == ".env" and path.parent.parent.name == "client":
+                verify_client_root(path.parent, group_gid)
         check_web_access(entries, web_user)
     else:
         error(f"Unknown permission action: {action}")
