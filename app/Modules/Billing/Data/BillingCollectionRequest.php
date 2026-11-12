@@ -6,6 +6,11 @@ use InvalidArgumentException;
 
 final readonly class BillingCollectionRequest
 {
+    // Business intent, not a payment-provider-specific Checkout option.
+    public const INTENT_PAYMENT = 'payment';
+
+    public const INTENT_DONATION = 'donation';
+
     /**
      * @param  array<string, mixed>  $meta
      */
@@ -18,7 +23,14 @@ final readonly class BillingCollectionRequest
         public ?string $customerEmail = null,
         public ?string $customerName = null,
         public array $meta = [],
+        public string $checkoutIntent = self::INTENT_PAYMENT,
     ) {
+        if (! in_array($this->checkoutIntent, [self::INTENT_PAYMENT, self::INTENT_DONATION], true)) {
+            throw new InvalidArgumentException(
+                'Billing collection checkout intent must be a supported business intent.',
+            );
+        }
+
         if ($this->billingPaymentRequestId < 1) {
             throw new InvalidArgumentException(
                 'Billing collection requests require a positive payment request identity.',
