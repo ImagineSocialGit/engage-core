@@ -1,5 +1,12 @@
 # Core selected-client Composer package revisions
 
+Both Core and SEO now invoke the shared B51 Infrastructure revision engine through
+`./scripts/package.sh update|repair` when Infrastructure is installed. Core
+retains its previous B47 Python updater as a **standalone fallback** when the
+standard Infrastructure checkout is absent and no explicit checkout override
+was supplied. The two engines have different plan fingerprints: always apply
+with the fingerprint issued by the same command and engine that produced the plan.
+
 This local workflow extends `scripts/package.sh`. It does not own package
 registration, client setup, module enablement, credential provisioning, or
 remote deployment. It operates on an existing Core client's own `composer.json`,
@@ -34,6 +41,23 @@ remote deployment. It operates on an existing Core client's own `composer.json`,
 - This is **local-only**. Do not run it directly on staging or production.
   Remote source releases must be deployed from approved immutable commits and
   locked client dependencies through Infrastructure.
+
+## Infrastructure selection and safety
+
+By default the wrapper discovers Infrastructure at
+`~/Projects/engage-infrastructure`. For a checkout elsewhere, explicitly set
+`ENGAGE_INFRASTRUCTURE_ROOT=/absolute/path/to/engage-infrastructure`. An
+explicitly selected missing checkout or an incomplete checkout is an error; the
+wrapper never silently falls back in that case. The wrapper binds `--platform
+core`, `--root` to its own checkout, `--env local`, the selected client, and the
+specified package; these values cannot be overridden with extra flags. Its
+supported revision flags are `--plan`, `--apply`, `--confirm-plan` and `--json`.
+
+The B51 shared engine refuses operations when any selected-client Composer
+dependency is development-linked; do not unlink a package merely for an audit.
+Read-only plans do not modify the client. An approved apply rechecks local
+selection and the exact reviewed plan. The normal `create`, `install`, `adopt`,
+`verify`, `audit`, `link` and `unlink` actions remain Core-owned.
 
 ## Update an already installed package
 
@@ -88,6 +112,6 @@ owns its Composer manifest, lockfile, and managed package declarations.
 `package.sh install` registers packages and optionally synchronizes package
 metadata, but is not a version-update operation. `package.sh update` and
 `package.sh repair` handle the revision stage for an existing direct Core
-package dependency only. They do not replace the SEO/Artist package lifecycle,
+package dependency only. They do not replace Core/SEO-specific registration and activation,
 provide a dependency solver themselves, or guarantee application-level
 compatibility. Host-facing integration tests remain necessary.
