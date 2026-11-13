@@ -2,7 +2,6 @@
 
 namespace Tests\Unit\Support\Presets;
 
-use App\Support\Modules\ModuleManager;
 use App\Support\Presets\Contracts\PresetContributor;
 use App\Support\Presets\Data\PresetContribution;
 use App\Support\Presets\Enums\PresetDomain;
@@ -159,9 +158,7 @@ class PresetCompositionResolverTest extends TestCase
     {
         return new PresetCompositionResolver(
             registry: $registry,
-            packageResolver: new PresetPackageResolver(
-                moduleManager: app(ModuleManager::class),
-            ),
+            packageResolver: new PresetPackageResolver(),
         );
     }
 }

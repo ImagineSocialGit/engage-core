@@ -64,7 +64,12 @@ class DeploymentPlanRegistrationTest extends TestCase
             ->values();
 
         foreach ($providers as $provider) {
-            (new $provider($this->app))->register();
+            // Active module providers have already registered their tagged
+            // contributors. Registering them again would duplicate dynamic
+            // environment definitions and mask the catalog ownership check.
+            if ($this->app->getProvider($provider) === null) {
+                (new $provider($this->app))->register();
+            }
         }
 
         $coveredOwners = collect(

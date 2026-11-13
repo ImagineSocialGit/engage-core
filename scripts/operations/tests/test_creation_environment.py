@@ -66,7 +66,7 @@ class CreationEnvironmentTest(unittest.TestCase):
         self.set_env("APP_ENV=production\n")
         args = argparse.Namespace(name="engage-seo-sample", type="vertical", platform="seo",
                                   owner="ImagineSocialGit", description="Sample", parent=None,
-                                  dry_run=False)
+                                  modules=None, dry_run=False)
         with mock.patch.object(workflow, "ROOT", self.root), \
              mock.patch.object(workflow, "run", side_effect=AssertionError("external action")), \
              mock.patch.object(workflow, "require_command", side_effect=AssertionError("external check")):
@@ -79,7 +79,7 @@ class CreationEnvironmentTest(unittest.TestCase):
         self.set_env(None)
         args = argparse.Namespace(name="engage-seo-sample", type="vertical", platform="seo",
                                   owner="ImagineSocialGit", description="Sample", parent=None,
-                                  dry_run=True)
+                                  modules=None, dry_run=True)
         with mock.patch.object(workflow, "ROOT", self.root), \
              mock.patch.object(workflow, "run", side_effect=AssertionError("external action")), \
              mock.patch.object(workflow, "require_command", side_effect=AssertionError("external check")):
