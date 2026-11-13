@@ -9,7 +9,7 @@ if [[ ! -f "$ROOT_DIR/artisan" ]]; then
 fi
 
 if [[ $# -lt 1 ]]; then
-    echo 'Usage: ./scripts/package.sh create|install|adopt|link|unlink|verify|audit ...' >&2
+    echo 'Usage: ./scripts/package.sh create|install|update|repair|adopt|link|unlink|verify|audit ...' >&2
     exit 2
 fi
 
@@ -19,6 +19,9 @@ shift
 case "$ACTION" in
     create|install|adopt|verify|audit)
         exec python3 "$ROOT_DIR/scripts/operations/lib/package_workflow.py" "$ACTION" "$@"
+        ;;
+    update|repair)
+        exec python3 "$ROOT_DIR/scripts/operations/lib/package_revision_workflow.py" "$ACTION" "$@"
         ;;
     link)
         if [[ $# -ne 2 ]]; then
@@ -40,7 +43,7 @@ case "$ACTION" in
         ;;
     *)
         echo "Unknown package action: $ACTION" >&2
-        echo 'Usage: ./scripts/package.sh create|install|adopt|link|unlink|verify|audit ...' >&2
+        echo 'Usage: ./scripts/package.sh create|install|update|repair|adopt|link|unlink|verify|audit ...' >&2
         exit 2
         ;;
 esac
