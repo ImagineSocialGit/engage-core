@@ -1,14 +1,15 @@
 <?php
 
 use App\Http\Controllers\Auth\LoginController;
+use App\Support\Routing\CoreApplicationHost;
 use App\Modules\Messaging\Controllers\Public\ContactPermissionInvitationController;
 use App\Modules\Messaging\Controllers\Public\CtaEngagementRedirectController;
 use Illuminate\Support\Facades\Route;
 
-$legacyCtaHost = parse_url((string) config('app.crm_url'), PHP_URL_HOST);
-$legacyCtaHost = is_string($legacyCtaHost) && $legacyCtaHost !== ''
-    ? $legacyCtaHost
-    : 'crm.'.config('app.root_domain');
+$legacyCtaHost = CoreApplicationHost::resolve(
+    config('app.crm_url'),
+    (string) config('app.root_domain'),
+);
 
 Route::get('/login', [LoginController::class, 'create'])->name('login');
 Route::post('/login', [LoginController::class, 'store'])->name('login.store');

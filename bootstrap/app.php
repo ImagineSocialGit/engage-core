@@ -6,6 +6,7 @@ use App\Http\Middleware\RequestCorrelation;
 use App\Http\Middleware\RequireCapability;
 use App\Http\Middleware\RequirePublicHumanVerification;
 use App\Support\Clients\ClientEnvironmentLoader;
+use App\Support\Routing\CoreApplicationHost;
 use App\Support\Clients\ClientPackageManifestLoader;
 use App\Support\Clients\ClientPackageRuntime;
 use Illuminate\Foundation\Application;
@@ -72,14 +73,10 @@ $app = Application::configure(basePath: dirname(__DIR__))
                     require base_path('routes/portal.php');
                 });
 
-            $crmHost = parse_url(
-                (string) config('app.crm_url'),
-                PHP_URL_HOST,
+            $crmHost = CoreApplicationHost::resolve(
+                config('app.crm_url'),
+                (string) $domain,
             );
-
-            $crmHost = is_string($crmHost) && $crmHost !== ''
-                ? $crmHost
-                : 'crm.'.$domain;
 
             Route::middleware(['web'])
                 ->domain($crmHost)
