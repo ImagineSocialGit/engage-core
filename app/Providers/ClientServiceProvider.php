@@ -101,6 +101,14 @@ class ClientServiceProvider extends ServiceProvider
                 ->replace(DIRECTORY_SEPARATOR, '.')
                 ->toString();
 
+            // Staging authentication is root/runtime-owned, not a client
+            // package override. Reject it even if this provider boots later.
+            if ($key === 'staging' || str_starts_with($key, 'staging.')) {
+                throw new \RuntimeException(
+                    'Client configuration cannot override root-owned staging access.',
+                );
+            }
+
             $clientConfig = require $path;
             $current = config($key);
 

@@ -1,23 +1,15 @@
 <?php
 
-use Illuminate\Http\Request;
+use App\Http\Controllers\StagingAccessController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/staging-login', function () {
-    return view('staging.login');
-})->name('staging.login');
+// These routes exist in every environment but return 404 outside staging.
+Route::get('/staging-login', [StagingAccessController::class, 'show'])
+    ->name('staging.login');
 
-Route::post('/staging-login', function (Request $request) {
-    if (
-        $request->input('user') === config('staging.user') &&
-        $request->input('password') === config('staging.password')
-    ) {
-        session(['staging_access' => true]);
+Route::post('/staging-login', [StagingAccessController::class, 'store'])
+    ->middleware('throttle:5,1')
+    ->name('staging.login.submit');
 
-        return redirect()->intended('/');
-    }
-
-    return back()->withErrors([
-        'login' => 'Invalid credentials',
-    ]);
-})->name('staging.login.submit');
+Route::post('/staging-logout', [StagingAccessController::class, 'destroy'])
+    ->name('staging.logout');
