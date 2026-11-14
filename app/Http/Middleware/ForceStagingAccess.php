@@ -18,6 +18,8 @@ final class ForceStagingAccess
      */
     private const EXTERNAL_ROUTES = [
         'webhooks.forms.show' => ['GET', 'HEAD'],
+        'webhooks.donations.external.checkout' => ['POST'],
+        'webhooks.donations.external.status' => ['GET', 'HEAD'],
         'webhooks.forms.submissions.store' => ['POST'],
         'webhooks.webinar' => ['POST'],
         'webhooks.message-events.email' => ['POST'],

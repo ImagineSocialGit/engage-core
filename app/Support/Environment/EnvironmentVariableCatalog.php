@@ -190,6 +190,7 @@ final class EnvironmentVariableCatalog
             ['APP_PREVIOUS_KEYS', $root, 'core', true],
             ['STAGING_USER', $root, 'core', false],
             ['STAGING_PASSWORD', $root, 'core', true],
+            ['STAGING_PASSWORD_HASH', $root, 'core', true],
             ['CRM_LOGIN_MAX_ATTEMPTS', $root, 'core', false],
             ['CRM_LOGIN_DECAY_SECONDS', $root, 'core', false],
             ['PUBLIC_HUMAN_VERIFICATION_PROVIDER', $root, 'core', false],

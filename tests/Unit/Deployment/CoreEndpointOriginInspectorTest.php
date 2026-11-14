@@ -45,6 +45,27 @@ final class CoreEndpointOriginInspectorTest extends TestCase
         self::assertSame('http://webhooks.example.test', $report['configured_webhook_origin']);
     }
 
+    public function test_app_operator_host_and_legacy_crm_host_share_the_registered_webhook_origin(): void
+    {
+        foreach (['app', 'crm'] as $host) {
+            $env = $this->clientEnvironment();
+            $env['ROOT_DOMAIN'] = 'staging.example.org';
+            $env['APP_URL'] = "https://{$host}.staging.example.org";
+            $env['CRM_APP_URL'] = $env['APP_URL'];
+            $result = $this->inspect('staging', $this->plan('staging'), $env,
+                $env['ROOT_DOMAIN'], $env['APP_URL']);
+            self::assertSame('configured_unverified', $result['status']);
+            self::assertSame('https://webhooks.staging.example.org', $result['configured_webhook_origin']);
+        }
+    }
+
+    public function test_unregistered_operator_subdomain_is_rejected(): void
+    {
+        $env = $this->clientEnvironment();
+        $env['CRM_APP_URL'] = 'http://unregistered.example.test';
+        $this->assertBlocked($this->inspect('local', null, $env), 'core_origin_host_or_scheme_mismatch');
+    }
+
     public function test_missing_unrelated_signing_secret_does_not_prevent_origin_inspection(): void
     {
         $plan = $this->plan();

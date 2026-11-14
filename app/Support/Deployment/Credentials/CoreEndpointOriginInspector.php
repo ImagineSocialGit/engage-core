@@ -73,8 +73,8 @@ final class CoreEndpointOriginInspector
         ) {
             $findings[] = 'effective_application_origin_mismatch';
         } elseif ($validDomain) {
-            $expectedCrmHost = 'crm.'.$rootDomain;
-            if ($crmOrigin['host'] !== $expectedCrmHost
+            $allowedCrmHosts = ['app.'.$rootDomain, 'crm.'.$rootDomain];
+            if (! in_array($crmOrigin['host'], $allowedCrmHosts, true)
                 || ($appOrigin['host'] !== $rootDomain
                     && ! str_ends_with($appOrigin['host'], '.'.$rootDomain))
                 || $appOrigin['scheme'] !== $crmOrigin['scheme']
