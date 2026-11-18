@@ -152,7 +152,10 @@ class CommerceInventoryOrchestrationTest extends TestCase
             CommerceInventoryEffect::STATUS_ADJUSTED,
             $effect->fresh()->status,
         );
-        $this->assertNull($adjustment->commerce_product_variant_provider_mapping_id);
+        $this->assertSame((int) $mapping->getKey(), $adjustment->commerce_product_variant_provider_mapping_id);
+        $this->assertSame('variant-100', $adjustment->meta['destination']['references'][0]['external_id']);
+        $this->assertSame('default', $adjustment->meta['destination']['inventory_scope']);
+        $this->assertTrue($adjustment->meta['fixture']);
         $this->assertSame((int) $mapping->commerce_product_variant_id, (int) $variant->getKey());
     }
 
@@ -216,23 +219,25 @@ class CommerceInventoryOrchestrationTest extends TestCase
             idempotencyKey: 'square:sale-300:variation-1',
         );
         $provider = new InventoryAdjustmentFixtureProvider('inventory-provider');
-        $idempotencyKey = $this->adjustmentIdempotencyKey(
-            providerKey: $provider->key(),
-            effectIdempotencyKey: (string) $effect->idempotency_key,
-        );
+        $provider->fail = true;
+        $orchestrator = $this->orchestrator($provider);
 
-        $adjustment = CommerceInventoryAdjustment::query()->create([
-            'commerce_inventory_effect_id' => $effect->getKey(),
-            'provider_key' => $provider->key(),
-            'quantity_delta' => $effect->quantity_delta,
+        try {
+            $orchestrator->orchestrate($effect);
+            $this->fail('Expected the initial provider call to fail.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('Fixture inventory adjustment failure.', $exception->getMessage());
+        }
+
+        $adjustment = CommerceInventoryAdjustment::query()->firstOrFail();
+        $adjustment->forceFill([
             'status' => CommerceInventoryAdjustment::STATUS_PROCESSING,
-            'idempotency_key' => $idempotencyKey,
-            'attempts' => 1,
-            'requested_at' => now(),
             'claimed_at' => now(),
-        ]);
+        ])->save();
+        $provider->requests = [];
+        $provider->fail = false;
 
-        $result = $this->orchestrator($provider)->orchestrate($effect);
+        $result = $orchestrator->orchestrate($effect);
 
         $this->assertSame(
             CommerceInventoryOrchestrationResult::OUTCOME_ADJUSTMENT_IN_PROGRESS,
@@ -252,23 +257,26 @@ class CommerceInventoryOrchestrationTest extends TestCase
             idempotencyKey: 'square:sale-400:variation-1',
         );
         $provider = new InventoryAdjustmentFixtureProvider('inventory-provider');
-        $idempotencyKey = $this->adjustmentIdempotencyKey(
-            providerKey: $provider->key(),
-            effectIdempotencyKey: (string) $effect->idempotency_key,
-        );
+        $provider->fail = true;
+        $orchestrator = $this->orchestrator($provider);
 
-        $adjustment = CommerceInventoryAdjustment::query()->create([
-            'commerce_inventory_effect_id' => $effect->getKey(),
-            'provider_key' => $provider->key(),
-            'quantity_delta' => $effect->quantity_delta,
+        try {
+            $orchestrator->orchestrate($effect);
+            $this->fail('Expected the initial provider call to fail.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('Fixture inventory adjustment failure.', $exception->getMessage());
+        }
+
+        $adjustment = CommerceInventoryAdjustment::query()->firstOrFail();
+        $idempotencyKey = $adjustment->idempotency_key;
+        $adjustment->forceFill([
             'status' => CommerceInventoryAdjustment::STATUS_PROCESSING,
-            'idempotency_key' => $idempotencyKey,
-            'attempts' => 1,
-            'requested_at' => now()->subMinutes(10),
             'claimed_at' => now()->subMinutes(10),
-        ]);
+        ])->save();
+        $provider->requests = [];
+        $provider->fail = false;
 
-        $result = $this->orchestrator($provider)->orchestrate($effect);
+        $result = $orchestrator->orchestrate($effect);
 
         $this->assertSame(
             CommerceInventoryOrchestrationResult::OUTCOME_ADJUSTED,
@@ -278,6 +286,116 @@ class CommerceInventoryOrchestrationTest extends TestCase
         $this->assertCount(1, $provider->requests);
         $this->assertSame($idempotencyKey, $provider->requests[0]->idempotencyKey);
         $this->assertSame(2, $adjustment->fresh()->attempts);
+    }
+
+    public function test_changed_variant_mapping_blocks_retry_without_misdirecting_stock(): void
+    {
+        [$variant, $mapping] = $this->mappedVariant();
+        $effect = $this->recordEffect(
+            variant: $variant,
+            authorityMode: CommerceInventoryAuthorityMode::AdjustmentRequired,
+            idempotencyKey: 'square:sale-600:variation-1',
+        );
+        $provider = new InventoryAdjustmentFixtureProvider('inventory-provider');
+        $provider->fail = true;
+        $orchestrator = $this->orchestrator($provider);
+
+        try {
+            $orchestrator->orchestrate($effect);
+            $this->fail('Expected the initial provider call to fail.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('Fixture inventory adjustment failure.', $exception->getMessage());
+        }
+
+        $mapping->forceFill(['external_id' => 'variant-200'])->save();
+        $provider->fail = false;
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('mapping changed after destination pinning');
+
+        try {
+            $orchestrator->orchestrate($effect);
+        } finally {
+            $this->assertCount(1, $provider->requests);
+            $adjustment = CommerceInventoryAdjustment::query()->firstOrFail();
+            $this->assertSame(1, $adjustment->attempts);
+            $this->assertStringContainsString('mapping changed after destination pinning', $adjustment->failure_reason);
+        }
+    }
+
+    public function test_successful_adjustment_remains_final_after_variant_mapping_is_removed(): void
+    {
+        [$variant, $mapping] = $this->mappedVariant();
+        $effect = $this->recordEffect(
+            variant: $variant,
+            authorityMode: CommerceInventoryAuthorityMode::AdjustmentRequired,
+            idempotencyKey: 'square:sale-700:variation-1',
+        );
+        $provider = new InventoryAdjustmentFixtureProvider('inventory-provider');
+        $orchestrator = $this->orchestrator($provider);
+
+        $orchestrator->orchestrate($effect);
+        $mapping->forceFill(['status' => CommerceProductVariantProviderMapping::STATUS_INACTIVE])->save();
+        $replayed = $orchestrator->orchestrate($effect);
+
+        $this->assertSame(CommerceInventoryOrchestrationResult::OUTCOME_ADJUSTED, $replayed->outcome);
+        $this->assertFalse($replayed->providerMutationAttempted);
+        $this->assertCount(1, $provider->requests);
+    }
+
+    public function test_legacy_unpinned_attempt_blocks_automatic_retry(): void
+    {
+        [$variant] = $this->mappedVariant();
+        $effect = $this->recordEffect(
+            variant: $variant,
+            authorityMode: CommerceInventoryAuthorityMode::AdjustmentRequired,
+            idempotencyKey: 'square:sale-800:variation-1',
+        );
+        $provider = new InventoryAdjustmentFixtureProvider('inventory-provider');
+        CommerceInventoryAdjustment::query()->create([
+            'commerce_inventory_effect_id' => $effect->getKey(),
+            'provider_key' => $provider->key(),
+            'quantity_delta' => $effect->quantity_delta,
+            'status' => CommerceInventoryAdjustment::STATUS_FAILED,
+            'idempotency_key' => $this->adjustmentIdempotencyKey(
+                providerKey: $provider->key(),
+                effectIdempotencyKey: (string) $effect->idempotency_key,
+            ),
+            'attempts' => 1,
+        ]);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('unpinned legacy destination');
+
+        try {
+            $this->orchestrator($provider)->orchestrate($effect);
+        } finally {
+            $this->assertCount(0, $provider->requests);
+            $this->assertSame(1, CommerceInventoryAdjustment::query()->firstOrFail()->attempts);
+        }
+    }
+
+    public function test_changed_provider_role_cannot_create_second_adjustment(): void
+    {
+        [$variant] = $this->mappedVariant();
+        $effect = $this->recordEffect(
+            variant: $variant,
+            authorityMode: CommerceInventoryAuthorityMode::AdjustmentRequired,
+            idempotencyKey: 'square:sale-900:variation-1',
+        );
+        $original = new InventoryAdjustmentFixtureProvider('inventory-provider');
+        $this->orchestrator($original)->orchestrate($effect);
+
+        $switched = new InventoryAdjustmentFixtureProvider('other-inventory-provider');
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('reused for a different effect');
+
+        try {
+            $this->orchestrator($switched)->orchestrate($effect);
+        } finally {
+            $this->assertCount(0, $switched->requests);
+            $this->assertSame(1, CommerceInventoryAdjustment::query()->count());
+        }
     }
 
     public function test_missing_provider_mapping_marks_adjustment_required_effect_failed_without_mutation(): void
