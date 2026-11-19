@@ -3,6 +3,7 @@
 namespace Tests\Feature\Commerce;
 
 use App\Modules\Commerce\Contracts\CommerceInventoryAdjustmentProvider;
+use App\Modules\Commerce\Contracts\CommerceInventoryLocationProvider;
 use App\Modules\Commerce\Data\CommerceInventoryAdjustmentRequest;
 use App\Modules\Commerce\Data\CommerceInventoryAdjustmentResult;
 use App\Modules\Commerce\Data\CommerceInventoryEffectData;
@@ -155,6 +156,8 @@ class CommerceInventoryOrchestrationTest extends TestCase
         $this->assertSame((int) $mapping->getKey(), $adjustment->commerce_product_variant_provider_mapping_id);
         $this->assertSame('variant-100', $adjustment->meta['destination']['references'][0]['external_id']);
         $this->assertSame('default', $adjustment->meta['destination']['inventory_scope']);
+        $this->assertSame('gid://shopify/Location/200', $adjustment->meta['destination']['inventory_location_id']);
+        $this->assertSame('gid://shopify/Location/200', $request->inventoryLocationId);
         $this->assertTrue($adjustment->meta['fixture']);
         $this->assertSame((int) $mapping->commerce_product_variant_id, (int) $variant->getKey());
     }
@@ -208,6 +211,83 @@ class CommerceInventoryOrchestrationTest extends TestCase
             CommerceInventoryEffect::STATUS_ADJUSTED,
             $effect->fresh()->status,
         );
+    }
+
+    public function test_changed_inventory_location_blocks_retry_until_original_location_is_restored(): void
+    {
+        [$variant] = $this->mappedVariant();
+        $effect = $this->recordEffect(
+            variant: $variant,
+            authorityMode: CommerceInventoryAuthorityMode::AdjustmentRequired,
+            idempotencyKey: 'square:location:1',
+        );
+        $provider = new InventoryAdjustmentFixtureProvider('inventory-provider');
+        $provider->fail = true;
+        $orchestrator = $this->orchestrator($provider);
+
+        try {
+            $orchestrator->orchestrate($effect);
+            $this->fail('Expected the initial adjustment to fail.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('Fixture inventory adjustment failure.', $exception->getMessage());
+        }
+
+        $adjustment = CommerceInventoryAdjustment::query()->firstOrFail();
+        $originalKey = $provider->requests[0]->idempotencyKey;
+        $provider->locationId = 'gid://shopify/Location/201';
+        $provider->fail = false;
+
+        try {
+            $orchestrator->orchestrate($effect);
+            $this->fail('Expected changed authority location to block retry.');
+        } catch (RuntimeException $exception) {
+            $this->assertStringContainsString('location changed', $exception->getMessage());
+        }
+
+        $this->assertCount(1, $provider->requests);
+        $this->assertSame(1, $adjustment->fresh()->attempts);
+        $this->assertSame(CommerceInventoryAdjustment::STATUS_FAILED, $adjustment->fresh()->status);
+
+        $provider->locationId = 'gid://shopify/Location/200';
+        $orchestrator->orchestrate($effect);
+        $this->assertCount(2, $provider->requests);
+        $this->assertSame($originalKey, $provider->requests[1]->idempotencyKey);
+        $this->assertSame('gid://shopify/Location/200', $provider->requests[1]->inventoryLocationId);
+    }
+
+    public function test_attempted_legacy_adjustment_without_location_pin_requires_reconciliation(): void
+    {
+        [$variant] = $this->mappedVariant();
+        $effect = $this->recordEffect(
+            variant: $variant,
+            authorityMode: CommerceInventoryAuthorityMode::AdjustmentRequired,
+            idempotencyKey: 'square:legacy-location:1',
+        );
+        $provider = new InventoryAdjustmentFixtureProvider('inventory-provider');
+        $provider->fail = true;
+        $orchestrator = $this->orchestrator($provider);
+
+        try {
+            $orchestrator->orchestrate($effect);
+            $this->fail('Expected initial failure.');
+        } catch (RuntimeException) {
+            $this->assertCount(1, $provider->requests);
+        }
+
+        $adjustment = CommerceInventoryAdjustment::query()->firstOrFail();
+        $meta = $adjustment->meta;
+        unset($meta['destination']['inventory_location_id']);
+        $adjustment->forceFill(['meta' => $meta])->save();
+        $provider->fail = false;
+
+        try {
+            $orchestrator->orchestrate($effect);
+            $this->fail('Expected the unpinned legacy location to block retry.');
+        } catch (RuntimeException $exception) {
+            $this->assertStringContainsString('unpinned legacy location', $exception->getMessage());
+        }
+
+        $this->assertCount(1, $provider->requests);
     }
 
     public function test_recent_processing_claim_does_not_fan_out_a_second_provider_call(): void
@@ -504,12 +584,19 @@ class CommerceInventoryOrchestrationTest extends TestCase
     }
 }
 
-final class InventoryAdjustmentFixtureProvider implements CommerceInventoryAdjustmentProvider
+final class InventoryAdjustmentFixtureProvider implements CommerceInventoryAdjustmentProvider, CommerceInventoryLocationProvider
 {
     /** @var array<int, CommerceInventoryAdjustmentRequest> */
     public array $requests = [];
 
     public bool $fail = false;
+
+    public string $locationId = 'gid://shopify/Location/200';
+
+    public function inventoryLocationId(?string $scope = null): string
+    {
+        return $this->locationId;
+    }
 
     public function __construct(
         private readonly string $providerKey,

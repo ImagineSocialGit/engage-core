@@ -3,6 +3,7 @@
 namespace App\Modules\Commerce\Services;
 
 use App\Modules\Commerce\Contracts\CommerceInventoryAdjustmentProvider;
+use App\Modules\Commerce\Contracts\CommerceInventoryLocationProvider;
 use App\Modules\Commerce\Data\CommerceInventoryAdjustmentRequest;
 use App\Modules\Commerce\Data\CommerceInventoryAdjustmentResult;
 use App\Modules\Commerce\Data\CommerceInventoryOrchestrationResult;
@@ -149,9 +150,18 @@ final class CommerceInventoryEffectOrchestrator
                 );
             }
 
+            $locationId = $provider instanceof CommerceInventoryLocationProvider
+                ? $provider->inventoryLocationId($effect->inventory_scope)
+                : null;
+
+            if ($locationId !== null && trim($locationId) === '') {
+                throw new RuntimeException('Commerce inventory provider returned a blank location identity.');
+            }
+
             $claim = $this->claimAdjustment(
                 effectId: (int) $effect->getKey(),
                 providerKey: $provider->key(),
+                locationId: $locationId,
             );
         } catch (Throwable $exception) {
             $this->markEffectFailed((int) $effect->getKey(), $exception);
@@ -194,6 +204,7 @@ final class CommerceInventoryEffectOrchestrator
             inventoryScope: $claimedEffect->inventory_scope,
             occurredAt: $claimedEffect->occurred_at,
             meta: is_array($claimedEffect->meta) ? $claimedEffect->meta : [],
+            inventoryLocationId: $claim['location_id'],
         );
 
         try {
@@ -227,14 +238,16 @@ final class CommerceInventoryEffectOrchestrator
      *     adjustment: CommerceInventoryAdjustment,
      *     claimed: bool,
      *     attempt: int,
-     *     reference: ?CommerceProviderVariantReference
+     *     reference: ?CommerceProviderVariantReference,
+     *     location_id: ?string
      * }
      */
     private function claimAdjustment(
         int $effectId,
         string $providerKey,
+        ?string $locationId,
     ): array {
-        return DB::transaction(function () use ($effectId, $providerKey): array {
+        return DB::transaction(function () use ($effectId, $providerKey, $locationId): array {
             $effect = CommerceInventoryEffect::query()
                 ->lockForUpdate()
                 ->findOrFail($effectId);
@@ -267,7 +280,7 @@ final class CommerceInventoryEffectOrchestrator
             $adjustment = $existing->first();
 
             if (! $adjustment instanceof CommerceInventoryAdjustment) {
-                $destination = $this->captureDestination($effect, $providerKey);
+                $destination = $this->captureDestination($effect, $providerKey, $locationId);
 
                 $adjustment = CommerceInventoryAdjustment::query()->create([
                     'commerce_inventory_effect_id' => $effect->getKey(),
@@ -300,6 +313,7 @@ final class CommerceInventoryEffectOrchestrator
                     'claimed' => false,
                     'attempt' => (int) $adjustment->attempts,
                     'reference' => null,
+                    'location_id' => $locationId,
                 ];
             }
 
@@ -315,6 +329,7 @@ final class CommerceInventoryEffectOrchestrator
                     'claimed' => false,
                     'attempt' => (int) $adjustment->attempts,
                     'reference' => null,
+                    'location_id' => $locationId,
                 ];
             }
 
@@ -331,7 +346,7 @@ final class CommerceInventoryEffectOrchestrator
                     );
                 }
 
-                $captured = $this->captureDestination($effect, $providerKey);
+                $captured = $this->captureDestination($effect, $providerKey, $locationId);
                 $destination = $captured['snapshot'];
                 $adjustment->forceFill([
                     'commerce_product_variant_provider_mapping_id' => $captured['mapping_id'],
@@ -340,6 +355,31 @@ final class CommerceInventoryEffectOrchestrator
                         ['destination' => $destination],
                     ),
                 ])->save();
+            }
+
+            // Location-aware integrations must never retry a previously
+            // attempted adjustment without an immutable location pin. For
+            // never-attempted legacy rows we can safely record that pin now.
+            if ($locationId !== null && ! array_key_exists('inventory_location_id', $destination)) {
+                if ((int) $adjustment->attempts > 0) {
+                    throw new RuntimeException(
+                        'Commerce inventory adjustment has an unpinned legacy location; manual reconciliation is required.',
+                    );
+                }
+
+                $destination['inventory_location_id'] = $locationId;
+                $adjustment->forceFill([
+                    'meta' => array_merge(
+                        is_array($adjustment->meta) ? $adjustment->meta : [],
+                        ['destination' => $destination],
+                    ),
+                ])->save();
+            }
+
+            if (($destination['inventory_location_id'] ?? null) !== $locationId) {
+                throw new RuntimeException(
+                    'Commerce inventory adjustment location changed after destination pinning; reconciliation is required.',
+                );
             }
 
             $reference = $this->restoreDestination($effect, $providerKey, $destination);
@@ -367,6 +407,7 @@ final class CommerceInventoryEffectOrchestrator
                 'claimed' => true,
                 'attempt' => $attempt,
                 'reference' => $reference,
+                'location_id' => $locationId,
             ];
         });
     }
@@ -550,6 +591,7 @@ final class CommerceInventoryEffectOrchestrator
     private function captureDestination(
         CommerceInventoryEffect $effect,
         string $providerKey,
+        ?string $locationId,
     ): array {
         $variant = CommerceProductVariant::query()->findOrFail(
             $effect->commerce_product_variant_id,
@@ -591,6 +633,7 @@ final class CommerceInventoryEffectOrchestrator
                 'commerce_product_id' => (int) $variant->commerce_product_id,
                 'commerce_product_variant_id' => (int) $variant->getKey(),
                 'inventory_scope' => $effect->inventory_scope,
+                'inventory_location_id' => $locationId,
                 'sku' => $resolved->sku,
                 'barcode' => $resolved->barcode,
                 'references' => $references,

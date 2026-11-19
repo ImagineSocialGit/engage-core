@@ -22,7 +22,14 @@ final readonly class CommerceInventoryAdjustmentRequest
         public ?string $inventoryScope = null,
         public ?DateTimeInterface $occurredAt = null,
         public array $meta = [],
+        public ?string $inventoryLocationId = null,
     ) {
+        if ($this->inventoryLocationId !== null && trim($this->inventoryLocationId) === '') {
+            throw new InvalidArgumentException(
+                'Commerce inventory adjustment pinned location must not be blank.',
+            );
+        }
+
         if ($this->commerceInventoryEffectId < 1) {
             throw new InvalidArgumentException(
                 'Commerce inventory adjustment requires a persisted inventory effect.',
