@@ -26,6 +26,52 @@ class WebhookInbox
         ?string $eventType = null,
         ?array $storedPayload = null,
     ): WebhookInboxReceipt {
+        $receipt = $this->receiveVerified(
+            provider: $provider,
+            payload: $payload,
+            providerEventId: $providerEventId,
+            signatureFingerprint: $signatureFingerprint,
+            eventType: $eventType,
+            storedPayload: $storedPayload,
+        );
+
+        $claimed = $this->claim((int) $receipt->getKey());
+
+        if (! $claimed instanceof WebhookInboxReceipt) {
+            return $receipt->fresh() ?? $receipt;
+        }
+
+        try {
+            $outcome = $processor();
+
+            $this->markCompleted($claimed, $this->normalizeOutcome($outcome));
+        } catch (Throwable $exception) {
+            $this->markRetryableFailed($claimed, $exception);
+
+            throw $exception;
+        }
+
+        return $claimed->fresh() ?? $claimed;
+    }
+
+    /**
+     * Persist a provider-authenticated notification before scheduling work.
+     *
+     * The caller MUST verify the provider signature before calling this method.
+     * The returned receipt remains "received" until recoverStoredReceipt() owns
+     * a processing claim. No provider I/O occurs in this method.
+     *
+     * @param array<string, mixed> $payload Original authenticated payload, used only to derive its fingerprint.
+     * @param array<string, mixed>|null $storedPayload Explicitly minimized durable processing identity.
+     */
+    public function receiveVerified(
+        string $provider,
+        array $payload,
+        ?string $providerEventId = null,
+        ?string $signatureFingerprint = null,
+        ?string $eventType = null,
+        ?array $storedPayload = null,
+    ): WebhookInboxReceipt {
         $provider = $this->requiredString($provider, 'provider');
         $providerEventId = $this->nullableString($providerEventId);
         $signatureFingerprint = $this->nullableString($signatureFingerprint);
@@ -67,23 +113,7 @@ class WebhookInbox
             payloadFingerprint: $payloadFingerprint,
         );
 
-        $claimed = $this->claim((int) $receipt->getKey());
-
-        if (! $claimed instanceof WebhookInboxReceipt) {
-            return $receipt->fresh() ?? $receipt;
-        }
-
-        try {
-            $outcome = $processor();
-
-            $this->markCompleted($claimed, $this->normalizeOutcome($outcome));
-        } catch (Throwable $exception) {
-            $this->markRetryableFailed($claimed, $exception);
-
-            throw $exception;
-        }
-
-        return $claimed->fresh() ?? $claimed;
+        return $receipt;
     }
 
     /**
@@ -91,7 +121,8 @@ class WebhookInbox
      * payload fingerprint from MySQL's JSON-normalized representation.
      *
      * This is not an ingress method. The receipt must already have been
-     * accepted through a provider-authenticated WebhookInbox::process() call.
+     * accepted through a provider-authenticated WebhookInbox::process() or
+     * WebhookInbox::receiveVerified() call.
      * Eligibility is checked while holding the receipt's database row lock.
      *
      * @param Closure(WebhookInboxReceipt): bool $eligible
