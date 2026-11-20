@@ -62,8 +62,6 @@ final class CoreDeploymentPlanContributor implements DeploymentPlanContributor, 
             'APP_MAINTENANCE_DRIVER',
             'APP_MAINTENANCE_STORE',
             'APP_PREVIOUS_KEYS',
-            'STAGING_USER',
-            'STAGING_PASSWORD',
             'CRM_LOGIN_MAX_ATTEMPTS',
             'CRM_LOGIN_DECAY_SECONDS',
             'PUBLIC_HUMAN_VERIFICATION_PROVIDER',
@@ -128,6 +126,27 @@ final class CoreDeploymentPlanContributor implements DeploymentPlanContributor, 
                 'Core provides a default; persist this key only when the deployment intentionally overrides that default.',
             );
         }
+
+        // Staging access checks only the root-owned password hash. The old
+        // plaintext key is intentionally ignored by config/staging.php.
+        $staging = app()->environment('staging');
+
+        foreach (['STAGING_USER', 'STAGING_PASSWORD_HASH'] as $key) {
+            yield $staging
+                ? EnvironmentRequirement::required(
+                    $key,
+                    'Staging browser access requires the root-owned username and password hash.',
+                )
+                : EnvironmentRequirement::optional(
+                    $key,
+                    'Only the staging browser access gate uses this root-owned credential.',
+                );
+        }
+
+        yield EnvironmentRequirement::optional(
+            'STAGING_PASSWORD',
+            'Deprecated plaintext staging password is ignored; use STAGING_PASSWORD_HASH instead.',
+        );
 
         // Client deployment identity remains explicit in every environment.
         foreach ([

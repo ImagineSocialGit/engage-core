@@ -107,6 +107,30 @@ class CoreDeploymentPlanContributorTest extends TestCase
         }
     }
 
+    public function test_staging_access_requires_root_owned_hash_not_the_legacy_plaintext_password(): void
+    {
+        app()->detectEnvironment(fn (): string => 'staging');
+
+        $requirements = $this->requirements();
+
+        $this->assertSame(EnvironmentRequirement::REQUIRED, $requirements['STAGING_USER']->requirement);
+        $this->assertSame(EnvironmentRequirement::REQUIRED, $requirements['STAGING_PASSWORD_HASH']->requirement);
+        $this->assertSame(EnvironmentRequirement::OPTIONAL, $requirements['STAGING_PASSWORD']->requirement);
+    }
+
+    public function test_non_staging_environments_do_not_require_staging_gate_credentials(): void
+    {
+        foreach (['local', 'production'] as $environment) {
+            app()->detectEnvironment(fn (): string => $environment);
+
+            $requirements = $this->requirements();
+
+            foreach (['STAGING_USER', 'STAGING_PASSWORD_HASH', 'STAGING_PASSWORD'] as $key) {
+                $this->assertSame(EnvironmentRequirement::OPTIONAL, $requirements[$key]->requirement);
+            }
+        }
+    }
+
     /** @return array<string, EnvironmentRequirement> */
     private function requirements(): array
     {

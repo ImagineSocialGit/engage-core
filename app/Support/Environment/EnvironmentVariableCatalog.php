@@ -108,6 +108,18 @@ final class EnvironmentVariableCatalog
             );
         }
 
+        // Static definitions live with their Core modules, not in this central
+        // catalog. Discover them without booting any module or reading env().
+        foreach (ModuleEnvironmentDefinitionLoader::definitions() as $key => $definition) {
+            if (isset($definitions[$key])) {
+                throw new InvalidArgumentException(
+                    "Module environment key [{$key}] conflicts with a registered environment key.",
+                );
+            }
+
+            $definitions[$key] = $definition;
+        }
+
         return $definitions;
     }
 
@@ -268,12 +280,6 @@ final class EnvironmentVariableCatalog
             ['FILESYSTEM_DISK', $root, 'storage', false],
             ['WEBHOOK_INBOX_CLAIM_LEASE_SECONDS', $root, 'core', false],
 
-            // Forms abuse controls are process-owned; client identity/secret is client-owned below.
-            ['FORMS_EXTERNAL_INTAKE_MAX_BODY_BYTES', $root, 'forms', false],
-            ['FORMS_EXTERNAL_INTAKE_MAX_TIMESTAMP_DRIFT_SECONDS', $root, 'forms', false],
-            ['FORMS_EXTERNAL_INTAKE_NONCE_TTL_SECONDS', $root, 'forms', false],
-            ['FORMS_EXTERNAL_INTAKE_UNAUTHENTICATED_RATE_LIMIT_PER_MINUTE', $root, 'forms', false],
-            ['FORMS_EXTERNAL_INTAKE_CLIENT_RATE_LIMIT_PER_MINUTE', $root, 'forms', false],
 
             // Messaging operational controls.
             ['RESEND_WEBHOOK_TIMESTAMP_DRIFT_SECONDS', $root, 'messaging', false],
@@ -317,7 +323,6 @@ final class EnvironmentVariableCatalog
             ['ROOT_DOMAIN', $client, 'core', false],
             ['WEBINAR_APP_URL', $client, 'webinars', false],
             ['CRM_APP_URL', $client, 'core', false],
-            ['FORMS_APP_URL', $client, 'forms', false],
             ['SCHEDULING_APP_URL', $client, 'scheduling', false],
             ['SCHEDULING_TRAVEL_PROVIDER', $client, 'scheduling', false],
             ['GOOGLE_ROUTES_API_KEY', $client, 'scheduling', true],
@@ -362,14 +367,6 @@ final class EnvironmentVariableCatalog
             ['INBOUND_REPLY_DEFAULT_TEAM_MEMBER_EMAIL', $client, 'inbound_messaging', false],
             ['PROJECT_STATE_ADMIN_EMAIL', $client, 'core', false],
 
-            // External Forms intake.
-            ['FORMS_EXTERNAL_INTAKE_ENABLED', $client, 'forms', false],
-            ['FORMS_EXTERNAL_INTAKE_CLIENT_ID', $client, 'forms', false],
-            ['FORMS_EXTERNAL_INTAKE_CLIENT_SECRET', $client, 'forms', true],
-            ['FORMS_EXTERNAL_INTAKE_SOURCE', $client, 'forms', false],
-            ['FORMS_EXTERNAL_INTAKE_PROVIDER', $client, 'forms', false],
-            ['FORMS_EXTERNAL_INTAKE_ALLOWED_FORMS', $client, 'forms', false],
-            ['FORMS_EXTERNAL_INTAKE_DOMAINS', $client, 'forms', false],
 
             // SMS provider selection and credentials.
             ['SMS_ENABLED', $client, 'messaging', false],
