@@ -89,6 +89,16 @@ final class ClientPackageManifestLoader
             autoloadPath: $autoloadPath,
         );
 
+        // A trusted local Composer symlink opts its registered package into
+        // live environment ownership metadata. This is in memory only and
+        // cannot rewrite the committed client release manifest.
+        $manifest = (new LocalLinkedPackageEnvironment())->apply(
+            basePath: $basePath,
+            clientDirectory: $clientDirectory,
+            manifestPath: $manifestPath,
+            manifest: $manifest,
+        );
+
         $environmentDefinitions = $this->environmentDefinitions(
             value: $manifest['environment'] ?? [],
             manifestPath: $manifestPath,

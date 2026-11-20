@@ -87,6 +87,46 @@ The installation operation:
 
 **Preservation rule:** If a client has an existing, hand-maintained `config/client_packages.php` without the managed registry, the installer refuses to overwrite it. Migrate that manifest deliberately using `docs/architecture/client-packages.md`, or continue to manage that client's Composer and manifest by hand. Managed manifests also fail closed if modified independently from the registry. Do not paste a new generated manifest over an existing production client.
 
+## Trusted local package development — live environment metadata
+
+For `APP_ENV=local`, an **already registered** package explicitly linked through
+`package.sh install CLIENT_KEY SOURCE --link` may supply its latest environment
+ownership declarations from its own `engage-package.json` at runtime. This is a
+local-only, **in-memory** overlay: `client_package_registry.json`, generated
+`client_packages.php`, Composer requirements and `composer.lock` remain untouched.
+You can edit a package's PHP files or add a client environment key declaration,
+then immediately rerun Artisan or make a new HTTP request without publishing a
+Git revision or running `--sync-metadata` on every edit. If the local Laravel
+configuration is cached, clear its cache before checking newly added keys;
+ordinary source edits do not require a Composer update.
+
+The local trust gate requires all of the following:
+
+- Core root `APP_ENV=local` (not `testing`, `staging` or `production`).
+- A selected client with a valid managed registry and generated PHP manifest.
+- A package that was **already registered** in the client's registry, then
+  explicitly symlinked under its selected-client Composer vendor directory.
+- A real package checkout in Core's sibling workspace, matching its exact
+  `imagine-social/engage-*` Composer identity and registered package descriptor.
+- Only the source descriptor's `environment` declaration may differ. Changes
+  to providers, contributed modules, migrations or other package identity and
+  lifecycle fields remain **reviewed** changes requiring `--sync-metadata`.
+- No conflicting provider environment keys, duplicate ownership, root-owned
+  variables or invalid owner/secret metadata. Invalid descriptors fail closed.
+
+This mode does **not** auto-install packages, auto-enable modules, update
+Composer dependencies, modify tracked client configuration, or expand staging
+and production access. A client with an unlinked dependency always uses its
+registered environment snapshot. Custom source locations outside Core's sibling
+workspace must use normal explicit metadata synchronization; there is no
+automatic trust of an arbitrary symlink destination.
+
+For a real client release, continue explicitly reviewing and registering changes
+with `--sync-metadata` so that its committed descriptor snapshot and generated
+manifest match the package revision approved for staging/production. `verify`
+checks Composer and the managed **registered snapshot**; local in-memory
+metadata changes do not rewrite that snapshot and are not automatically promoted.
+
 ## Local runtime file access and diagnostics
 
 The single policy implementation is `scripts/operations/lib/client_file_permissions.py`.

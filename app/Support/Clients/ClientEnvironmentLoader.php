@@ -9,6 +9,9 @@ use RuntimeException;
 
 final class ClientEnvironmentLoader
 {
+    /** @var list<string> Keys owned by a prior selected client/manifest in this PHP process. */
+    private static array $previousOwnedKeys = [];
+
     public function load(string $basePath, bool $deferUnknownKeys = false): void
     {
         $clientKey = $this->clientKey();
@@ -29,9 +32,16 @@ final class ClientEnvironmentLoader
          * values from a previously selected client from leaking through even
          * when the newly selected client does not have a .env file yet.
          */
-        foreach (self::clientOwnedKeys() as $key) {
+        $allowed = self::clientOwnedKeys();
+
+        // A linked development package may remove an ENV declaration while
+        // a long-lived PHP process is still running. Clear keys that were
+        // client-owned earlier as well as the currently registered keys.
+        foreach (array_unique([...self::$previousOwnedKeys, ...$allowed]) as $key) {
             $this->clearEnvironmentValue($key);
         }
+
+        self::$previousOwnedKeys = $allowed;
 
         $clientDirectory = rtrim($basePath, DIRECTORY_SEPARATOR)
             .DIRECTORY_SEPARATOR.'client'
@@ -55,7 +65,6 @@ final class ClientEnvironmentLoader
             '.env',
         )->safeLoad();
 
-        $allowed = self::clientOwnedKeys();
         $unsupportedKeys = array_values(array_diff(array_keys($values), $allowed));
 
         // During early bootstrap only statically owned values can be injected.
