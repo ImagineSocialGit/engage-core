@@ -6,10 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Modules\Commerce\Services\CommercePrivacyRequestReadService;
 use App\Modules\Commerce\Services\CommerceCustomerPrivacyService;
+use App\Modules\Commerce\Services\CommercePrivacyDataExportService;
 use App\Support\Webhooks\Models\WebhookInboxReceipt;
 use App\Modules\Core\Access\Services\UserAccessService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
 
@@ -56,12 +58,31 @@ final class CommercePrivacyRequestController extends Controller
             );
 
             $customerId = data_get($locked->payload, 'customer_id');
-            abort_unless(is_string($customerId) && preg_match('/^[1-9][0-9]*$/D', $customerId) === 1, 422);
+            $orderIds = data_get($locked->payload, 'order_ids', []);
+            abort_unless(is_array($orderIds), 422);
+            abort_unless(
+                (is_string($customerId) && preg_match('/^[1-9][0-9]*$/D', $customerId) === 1)
+                || $orderIds !== [],
+                422,
+            );
 
-            $outcome = $privacy->redactProviderCustomer('shopify', 'gid://shopify/Customer/'.$customerId);
+            $outcome = ['customer_found' => false, 'commerce_redacted' => false];
+            if (is_string($customerId) && preg_match('/^[1-9][0-9]*$/D', $customerId) === 1) {
+                $outcome = $privacy->redactProviderCustomer('shopify', 'gid://shopify/Customer/'.$customerId);
+            }
+
+            $matchedOrders = 0;
+            foreach (array_unique($orderIds) as $orderId) {
+                abort_unless(is_string($orderId) && preg_match('/^[1-9][0-9]*$/D', $orderId) === 1, 422);
+                $redactedOrder = $privacy->redactProviderOrder('shopify', 'gid://shopify/Order/'.$orderId);
+                $matchedOrders += $redactedOrder['order_found'] ? 1 : 0;
+            }
+
             $locked->forceFill([
                 'outcome' => [
                     ...$outcome,
+                    'orders_referenced' => count(array_unique($orderIds)),
+                    'orders_found' => $matchedOrders,
                     'reviewed_by_user_id' => (int) $user->getKey(),
                     'commerce_scoped_reviewed_at' => now()->toIso8601String(),
                     'shared_crm_contact_review_required' => true,
@@ -73,6 +94,25 @@ final class CommercePrivacyRequestController extends Controller
         return redirect()
             ->route('crm.commerce.privacy.index')
             ->with('success', 'Commerce customer data reviewed. The overall privacy request remains pending merchant review.');
+    }
+
+    public function export(
+        Request $request,
+        WebhookInboxReceipt $receipt,
+        UserAccessService $access,
+        CommercePrivacyDataExportService $exports,
+    ): JsonResponse {
+        $user = $request->user();
+        abort_unless($user instanceof User && $access->allows($user, 'settings.manage'), 403);
+
+        $report = $exports->prepare((int) $receipt->getKey(), (int) $user->getKey());
+
+        return response()->json($report, 200, [
+            'Cache-Control' => 'private, no-store, max-age=0',
+            'Pragma' => 'no-cache',
+            'X-Content-Type-Options' => 'nosniff',
+            'Content-Disposition' => 'attachment; filename="commerce-privacy-'.$receipt->getKey().'.json"',
+        ]);
     }
 
     public function complete(

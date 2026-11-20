@@ -18,6 +18,8 @@ Route::middleware('module:commerce')
         Route::get('/privacy', CommercePrivacyRequestController::class)
             ->middleware(AuditProtectedDataRead::class.':commerce_privacy,list')
             ->name('privacy.index');
+        Route::get('/privacy/{receipt}/export', [CommercePrivacyRequestController::class, 'export'])
+            ->name('privacy.export');
         Route::post('/privacy/{receipt}/redact-customer', [CommercePrivacyRequestController::class, 'redactCustomer'])
             ->name('privacy.redact-customer');
         Route::post('/privacy/{receipt}/complete', [CommercePrivacyRequestController::class, 'complete'])

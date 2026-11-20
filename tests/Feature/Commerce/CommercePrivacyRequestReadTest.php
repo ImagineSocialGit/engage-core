@@ -74,6 +74,58 @@ final class CommercePrivacyRequestReadTest extends TestCase
         $this->assertSame(0, $service->pending()->total());
     }
 
+    public function test_data_request_fulfillment_requires_commerce_export_to_be_prepared(): void
+    {
+        config()->set('client.key', 'lab');
+        $receipt = app(WebhookInbox::class)->receiveVerified(
+            provider: 'shopify',
+            payload: ['customer' => ['id' => 502]],
+            providerEventId: 'privacy-access-502',
+            eventType: 'privacy.customers/data_request',
+            storedPayload: ['customer_id' => '502', 'order_ids' => []],
+        );
+        $service = app(CommercePrivacyRequestReadService::class);
+
+        try {
+            $service->completeReviewed((int) $receipt->getKey(), 3, 'fulfilled', 'ACCESS-502');
+            $this->fail('Expected export preparation to be required.');
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $exception) {
+            $this->assertSame(422, $exception->getStatusCode());
+        }
+
+        app(\App\Modules\Commerce\Services\CommercePrivacyDataExportService::class)
+            ->prepare((int) $receipt->getKey(), 3);
+        $service->completeReviewed((int) $receipt->getKey(), 3, 'fulfilled', 'ACCESS-502');
+
+        $this->assertSame('completed', $receipt->fresh()->status);
+        $this->assertNotNull(data_get($receipt->fresh()->outcome, 'commerce_export_prepared_at'));
+    }
+
+    public function test_order_only_redaction_request_requires_a_scoped_review(): void
+    {
+        config()->set('client.key', 'lab');
+        $receipt = app(WebhookInbox::class)->receiveVerified(
+            provider: 'shopify',
+            payload: ['orders_to_redact' => [899]],
+            providerEventId: 'privacy-order-899',
+            eventType: 'privacy.customers/redact',
+            storedPayload: ['customer_id' => null, 'order_ids' => ['899']],
+        );
+        $service = app(CommercePrivacyRequestReadService::class);
+
+        try {
+            $service->completeReviewed((int) $receipt->getKey(), 3, 'fulfilled', 'CASE-899');
+            $this->fail('Expected order-only redaction review to be required.');
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $exception) {
+            $this->assertSame(422, $exception->getStatusCode());
+        }
+        app(\App\Modules\Commerce\Services\CommerceCustomerPrivacyService::class)
+            ->redactProviderOrder('shopify', 'gid://shopify/Order/899');
+        $receipt->forceFill(['outcome' => ['commerce_scoped_reviewed_at' => now()->toIso8601String()]])->save();
+        $service->completeReviewed((int) $receipt->getKey(), 3, 'fulfilled', 'CASE-899');
+        $this->assertSame('completed', $receipt->fresh()->status);
+    }
+
     public function test_privacy_review_cannot_close_receipt_from_a_different_client(): void
     {
         config()->set('client.key', 'client-one');

@@ -68,6 +68,13 @@ return [
     |
     */
 
+    // Completed privacy requests retain minimal replay keys, while customer
+    // and order identifiers are scrubbed after the approved retention window.
+    // Pending requests and legal-retention dispositions are never scrubbed.
+    'privacy' => [
+        'completed_receipt_identifiers_days' => 90,
+    ],
+
     'storefront' => [
         'views' => [
             CommerceStorefrontView::Home->value => CommerceStorefrontView::Home->defaultView(),

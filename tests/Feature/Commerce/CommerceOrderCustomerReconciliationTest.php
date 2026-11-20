@@ -217,6 +217,31 @@ class CommerceOrderCustomerReconciliationTest extends TestCase
         $this->assertSame(0, Contact::query()->count());
     }
 
+    public function test_late_sync_of_previously_redacted_guest_order_never_recreates_contact(): void
+    {
+        $privacy = app(\App\Modules\Commerce\Services\CommerceCustomerPrivacyService::class);
+        $privacy->redactProviderOrder('order-provider', 'order-500');
+
+        $service = $this->service(new CustomerOrderFixtureProvider([
+            'order-500' => $this->snapshot(
+                new CommerceOrderCustomerSnapshotData(
+                    externalId: null,
+                    name: 'Deleted Buyer',
+                    email: 'previously-erased@example.test',
+                ),
+            ),
+        ]));
+        $result = $service->sync(new CommerceOrderSyncRequest('order-500'));
+        $service->sync(new CommerceOrderSyncRequest('order-500'));
+
+        $this->assertSame(0, Contact::query()->count());
+        $order = CommerceOrder::query()->findOrFail($result->commerceOrderId);
+        $this->assertNull($order->contact_id);
+        $this->assertNull($order->commerce_customer_id);
+        $this->assertNotNull(data_get($order->meta, 'privacy.redacted_at'));
+        $this->assertSame(5000, $order->total_cents);
+    }
+
     private function service(
         CommerceOrderProvider $provider,
     ): CommerceOrderSyncService {

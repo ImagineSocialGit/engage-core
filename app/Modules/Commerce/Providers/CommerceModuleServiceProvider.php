@@ -4,10 +4,12 @@ namespace App\Modules\Commerce\Providers;
 
 use App\Modules\Commerce\Services\CommerceProviderRegistry;
 use App\Modules\Commerce\Services\CommerceProviderRoleResolver;
+use App\Modules\Commerce\Services\CommercePrivacyReceiptRetentionService;
 use App\Modules\Commerce\Services\ContactPanels\CommercePurchaseHistoryContactPanelProvider;
 use App\Modules\Commerce\Validation\CommerceSetupValidationContributor;
 use App\Modules\Core\Support\Contacts\ContactPanelRegistry;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Console\Scheduling\Schedule;
 
 class CommerceModuleServiceProvider extends ServiceProvider
 {
@@ -34,5 +36,18 @@ class CommerceModuleServiceProvider extends ServiceProvider
             CommercePurchaseHistoryContactPanelProvider::class,
             'commerce',
         );
+
+        if ($this->app->runningInConsole()) {
+            $this->callAfterResolving(Schedule::class, function (Schedule $schedule): void {
+                $schedule
+                    ->call(function (): void {
+                        $days = (int) config('commerce.privacy.completed_receipt_identifiers_days', 90);
+                        app(CommercePrivacyReceiptRetentionService::class)->scrubResolved($days);
+                    })
+                    ->name('commerce:privacy-receipt-retention')
+                    ->dailyAt('03:10')
+                    ->withoutOverlapping();
+            });
+        }
     }
 }

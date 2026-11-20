@@ -71,12 +71,22 @@ final class CommercePrivacyRequestReadService
 
             if ($receipt->event_type === 'privacy.customers/data_request') {
                 abort_if($disposition === 'legal_retention', 422);
+                // A verified request with identifiable Commerce records must
+                // have a prepared merchant export before an operator attests
+                // that the request was fulfilled. Delivery remains manual.
+                if ($disposition === 'fulfilled'
+                    && (data_get($receipt->payload, 'customer_id') !== null
+                        || data_get($receipt->payload, 'order_ids', []) !== [])
+                ) {
+                    abort_unless(is_string(data_get($receipt->outcome, 'commerce_export_prepared_at')), 422);
+                }
             }
 
             // Explicitly review the scoped Commerce customer before a final
             // redaction decision; this does not assert shared CRM erasure.
             if ($receipt->event_type === 'privacy.customers/redact'
-                && data_get($receipt->payload, 'customer_id') !== null
+                && (data_get($receipt->payload, 'customer_id') !== null
+                    || data_get($receipt->payload, 'order_ids', []) !== [])
             ) {
                 abort_unless(is_string(data_get($receipt->outcome, 'commerce_scoped_reviewed_at')), 422);
             }

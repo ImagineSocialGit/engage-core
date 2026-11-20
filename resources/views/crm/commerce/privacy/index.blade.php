@@ -10,7 +10,7 @@
             <table class="w-full text-left text-sm">
                 <thead class="bg-slate-50 text-slate-600">
                     <tr>
-                        <th class="px-4 py-3">Received</th>
+                        <th class="px-4 py-3">Received / due</th>
                         <th class="px-4 py-3">Provider / request</th>
                         <th class="px-4 py-3">Customer identity</th>
                         <th class="px-4 py-3">Orders referenced</th>
@@ -21,7 +21,14 @@
                 <tbody class="divide-y divide-slate-100">
                     @forelse($requests as $entry)
                         <tr>
-                            <td class="px-4 py-3 whitespace-nowrap">{{ $entry->created_at?->format('Y-m-d H:i') }}</td>
+                            <td class="px-4 py-3 whitespace-nowrap">
+                                <div>{{ $entry->created_at?->format('Y-m-d H:i') }}</div>
+                                @if($entry->created_at)
+                                    <div class="text-xs {{ $entry->created_at->copy()->addDays(30)->isPast() ? 'font-semibold text-red-700' : 'text-slate-600' }}">
+                                        Due {{ $entry->created_at->copy()->addDays(30)->format('Y-m-d') }}
+                                    </div>
+                                @endif
+                            </td>
                             <td class="px-4 py-3">
                                 <div class="font-semibold">{{ $entry->provider }}</div>
                                 <div class="text-slate-600">{{ $entry->event_type }}</div>
@@ -38,7 +45,13 @@
                             <td class="px-4 py-3">{{ count(data_get($entry->payload, 'order_ids', [])) }}</td>
                             <td class="px-4 py-3 font-semibold text-amber-900">{{ str($entry->status)->replace('_', ' ')->headline() }}</td>
                             <td class="px-4 py-3">
-                                @if($entry->event_type === 'privacy.customers/redact' && data_get($entry->payload, 'customer_id'))
+                                @if($entry->event_type === 'privacy.customers/data_request'
+                                    && (data_get($entry->payload, 'customer_id') || data_get($entry->payload, 'order_ids', []) !== []))
+                                    <a href="{{ route('crm.commerce.privacy.export', $entry) }}" class="inline-block rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-800">Prepare Commerce data export</a>
+                                    <div class="mt-2 text-xs text-slate-500">Other CRM modules and merchant records require separate review. Export is private and must be delivered securely.</div>
+                                @endif
+                                @if($entry->event_type === 'privacy.customers/redact'
+                                    && (data_get($entry->payload, 'customer_id') || data_get($entry->payload, 'order_ids', []) !== []))
                                     @if(data_get($entry->outcome, 'commerce_scoped_reviewed_at'))
                                         <span class="text-xs font-semibold text-slate-700">
                                             @if(data_get($entry->outcome, 'customer_found'))
@@ -48,17 +61,17 @@
                                             @endif
                                         </span>
                                     @else
-                                        <form method="POST" action="{{ route('crm.commerce.privacy.redact-customer', $entry) }}" onsubmit="return confirm('Pseudonymize the Shopify customer in Commerce? This does not delete shared CRM contacts or complete the privacy request.');">
+                                        <form method="POST" action="{{ route('crm.commerce.privacy.redact-customer', $entry) }}" onsubmit="return confirm('Pseudonymize the referenced Shopify customers and orders in Commerce? This does not delete shared CRM contacts or complete the privacy request.');">
                                             @csrf
                                             <input type="hidden" name="acknowledge_partial" value="1">
-                                            <button type="submit" class="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-800">Redact Commerce customer</button>
+                                            <button type="submit" class="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-800">Redact Commerce records</button>
                                         </form>
                                     @endif
                                 @else
                                     <span class="text-xs text-slate-500">Manual merchant review required</span>
                                 @endif
                                 @if($entry->event_type !== 'privacy.customers/redact'
-                                    || !data_get($entry->payload, 'customer_id')
+                                    || (!data_get($entry->payload, 'customer_id') && data_get($entry->payload, 'order_ids', []) === [])
                                     || data_get($entry->outcome, 'commerce_scoped_reviewed_at'))
                                     <form method="POST" action="{{ route('crm.commerce.privacy.complete', $entry) }}" class="mt-3 space-y-2" onsubmit="return confirm('Confirm merchant review, related data, legal retention and external evidence are complete? This closes the privacy request.');">
                                         @csrf

@@ -89,6 +89,8 @@ final class CommerceOrderSyncService
             $previousStatus = $order->exists
                 ? (string) $order->status
                 : null;
+            $privacyRedactedAt = data_get($order->meta, 'privacy.redacted_at');
+            $privacyRedacted = is_string($privacyRedactedAt) && $privacyRedactedAt !== '';
 
             $commerceCustomerId = $order->exists
                 ? $order->commerce_customer_id
@@ -97,7 +99,12 @@ final class CommerceOrderSyncService
                 ? $order->contact_id
                 : null;
 
-            if ($snapshot->customer !== null) {
+            // An exact provider order redaction is sticky across replay, even
+            // when the provider later returns a guest checkout email again.
+            if ($privacyRedacted) {
+                $commerceCustomerId = null;
+                $contactId = null;
+            } elseif ($snapshot->customer !== null) {
                 $customer = $this->customers->reconcile(
                     providerKey: $providerKey,
                     snapshot: $snapshot->customer,
@@ -131,7 +138,9 @@ final class CommerceOrderSyncService
                 'external_id' => $snapshot->externalId,
                 'external_url' => $this->nullableString($snapshot->externalUrl),
                 'raw_payload' => null,
-                'meta' => $snapshot->meta !== [] ? $snapshot->meta : null,
+                'meta' => $privacyRedacted
+                    ? ['privacy' => ['redacted_at' => $privacyRedactedAt]]
+                    : ($snapshot->meta !== [] ? $snapshot->meta : null),
             ]);
 
             if (! $orderCreated) {
@@ -205,10 +214,17 @@ final class CommerceOrderSyncService
             $inventoryEffectIds,
         );
 
-        $this->purchaseConfirmations->confirm(
-            commerceOrderId: $result->commerceOrderId,
-            occurredAt: $request->occurredAt ?? $snapshot->orderedAt,
-        );
+        // Exact order or customer redaction must not trigger customer automation
+        // on a delayed provider event, even when the financial record remains.
+        $syncedOrder = CommerceOrder::query()->with('commerceCustomer')->find($result->commerceOrderId);
+        $orderRedacted = is_string(data_get($syncedOrder?->meta, 'privacy.redacted_at'));
+        $customerRedacted = is_string(data_get($syncedOrder?->commerceCustomer?->meta, 'privacy.redacted_at'));
+        if (! $orderRedacted && ! $customerRedacted) {
+            $this->purchaseConfirmations->confirm(
+                commerceOrderId: $result->commerceOrderId,
+                occurredAt: $request->occurredAt ?? $snapshot->orderedAt,
+            );
+        }
 
         return $result;
     }
@@ -255,7 +271,9 @@ final class CommerceOrderSyncService
             'name' => $this->nullableString($data->name),
             'title' => $this->nullableString($data->title),
             'variant_title' => $this->nullableString($data->variantTitle),
-            'options' => $data->options !== [] ? $data->options : null,
+            'options' => is_string(data_get($order->meta, 'privacy.redacted_at'))
+                ? null
+                : ($data->options !== [] ? $data->options : null),
             'quantity' => trim($data->quantity),
             'currency' => $this->currency($data->currency),
             'unit_price_cents' => $data->unitPriceCents,
@@ -270,7 +288,9 @@ final class CommerceOrderSyncService
             'external_variant_id' => $this->nullableString($data->externalVariantId),
             'external_url' => $this->nullableString($data->externalUrl),
             'raw_payload' => null,
-            'meta' => $data->meta !== [] ? $data->meta : null,
+            'meta' => is_string(data_get($order->meta, 'privacy.redacted_at'))
+                ? null
+                : ($data->meta !== [] ? $data->meta : null),
         ]);
 
         if (! $created) {

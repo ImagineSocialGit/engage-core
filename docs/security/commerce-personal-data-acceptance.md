@@ -91,3 +91,16 @@ primary database. Do not select Yes on the Shopify questionnaire without checkin
 operational reality.
 
 **No provider or merchant production account is mutated by this branch.**
+
+## Operational privacy retention schedule
+
+- Commerce registers `commerce:privacy-receipt-retention` for 03:10 daily when
+  its module provider is loaded. The scheduler must actually run in production.
+- Default `commerce.privacy.completed_receipt_identifiers_days` is 90 and may be
+  overridden by approved client policy. Only completed Shopify privacy receipts
+  older than the cutoff are minimized; the receipt key/status remains for replay.
+- Pending/failed/unreviewed requests and cases with a `legal_retention`
+  disposition or explicit retention hold are never auto-scrubbed.
+- This does **not** delete retained financial orders, CRM Contacts, documents,
+  message history, provider records, or encrypted backups. Each requires its own
+  approved schedule and a verifiable disposition before item 8 can be certified.
