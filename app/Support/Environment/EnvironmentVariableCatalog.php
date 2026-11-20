@@ -231,9 +231,6 @@ final class EnvironmentVariableCatalog
 
             // Cache/session/queue/Redis process infrastructure.
             ['CACHE_STORE', $root, 'core', false],
-            ['CACHE_NEXT_UPCOMING_WEBINAR_EMPTY_SECONDS', $root, 'webinars', false],
-            ['CACHE_NEXT_UPCOMING_WEBINAR_MIN_SECONDS', $root, 'webinars', false],
-            ['CACHE_ACTIVE_WEBINAR_SERIES_MIN_SECONDS', $root, 'webinars', false],
             ['CACHE_EXTERNAL_API_RESPONSE_SECONDS', $root, 'core', false],
             ['CACHE_IMAGE_MANIFEST_SECONDS', $root, 'core', false],
             ['SESSION_DRIVER', $root, 'core', false],
@@ -247,23 +244,6 @@ final class EnvironmentVariableCatalog
             ['QUEUE_FAILED_DRIVER', $root, 'core', false],
             ['CONTACT_INGESTION_QUEUE', $root, 'core', false],
             ['CONTACT_ENRICHMENT_QUEUE', $root, 'core', false],
-            ['FLOW_ROUTE_CONTINUATION_QUEUE', $root, 'flow_routes', false],
-            ['WEBINAR_REGISTRATION_QUEUE', $root, 'webinars', false],
-            ['WEBINAR_WEBHOOK_QUEUE', $root, 'webinars', false],
-            ['WEBINAR_REMINDER_QUEUE', $root, 'webinars', false],
-            ['WEBINAR_CONFIRMATION_MESSAGE_QUEUE', $root, 'webinars', false],
-            ['WEBINAR_FOLLOWUP_QUEUE', $root, 'webinars', false],
-            ['SMS_QUEUE', $root, 'messaging', false],
-            ['MESSAGING_DELIVERY_CLAIM_LEASE_SECONDS', $root, 'messaging', false],
-            ['MESSAGING_DELIVERY_RECOVERY_BATCH_SIZE', $root, 'messaging', false],
-            ['MESSAGING_PENDING_MESSAGE_OVERDUE_GRACE_SECONDS', $root, 'messaging', false],
-            ['MESSAGING_BULK_CHUNK_SIZE', $root, 'messaging', false],
-            ['MESSAGING_BULK_RELEASE_INTERVAL_SECONDS', $root, 'messaging', false],
-            ['MESSAGING_PROVIDER_RATE_LIMIT_CACHE_STORE', $root, 'messaging', false],
-            ['MESSAGING_RESEND_RATE_LIMIT_ENABLED', $root, 'messaging', false],
-            ['MESSAGING_RESEND_MAX_REQUESTS_PER_SECOND', $root, 'messaging', false],
-            ['MESSAGING_RESEND_RATE_LIMIT_SCOPE', $root, 'messaging', false],
-            ['FLOW_ROUTE_IMMEDIATE_EXECUTION_BUDGET', $root, 'flow_routes', false],
             ['REDIS_CLIENT', $root, 'core', false],
             ['REDIS_HOST', $root, 'core', false],
             ['REDIS_SCHEME', $root, 'core', false],
@@ -279,24 +259,6 @@ final class EnvironmentVariableCatalog
             ['REDIS_BACKOFF_CAP', $root, 'core', false],
             ['FILESYSTEM_DISK', $root, 'storage', false],
             ['WEBHOOK_INBOX_CLAIM_LEASE_SECONDS', $root, 'core', false],
-
-
-            // Messaging operational controls.
-            ['RESEND_WEBHOOK_TIMESTAMP_DRIFT_SECONDS', $root, 'messaging', false],
-            ['EMAIL_UNSUBSCRIBE_SIGNED_URL_EXPIRATION_DAYS', $root, 'messaging', false],
-            ['EMAIL_TRANSACTIONAL_OPT_OUT_SIGNED_URL_EXPIRATION_DAYS', $root, 'messaging', false],
-            ['TELNYX_WEBHOOK_MAX_TIMESTAMP_DRIFT_SECONDS', $root, 'messaging', false],
-            ['SMS_RATE_LIMIT_PER_IP_PER_HOUR', $root, 'messaging', false],
-            ['SMS_RATE_LIMIT_PER_PHONE_PER_DAY', $root, 'messaging', false],
-            ['SMS_DUPLICATE_WINDOW_MINUTES', $root, 'messaging', false],
-            ['SMS_DAILY_ALERT_THRESHOLD', $root, 'messaging', false],
-            ['SMS_DAILY_HARD_LIMIT', $root, 'messaging', false],
-
-            // Webinar/Zoom process controls.
-            ['ZOOM_BASE_URL', $root, 'webinars', false],
-            ['ZOOM_OAUTH_URL', $root, 'webinars', false],
-            ['ZOOM_OAUTH_TOKEN_TTL_SECONDS', $root, 'webinars', false],
-            ['ZOOM_WEBHOOK_MAX_TIMESTAMP_DRIFT_SECONDS', $root, 'webinars', false],
 
             // Horizon/worker process tuning.
             ['HORIZON_WAIT_THRESHOLD_DEFAULT', $root, 'core', false],
@@ -321,11 +283,7 @@ final class EnvironmentVariableCatalog
             // Selected-client URLs and database identity.
             ['APP_URL', $client, 'core', false],
             ['ROOT_DOMAIN', $client, 'core', false],
-            ['WEBINAR_APP_URL', $client, 'webinars', false],
             ['CRM_APP_URL', $client, 'core', false],
-            ['SCHEDULING_APP_URL', $client, 'scheduling', false],
-            ['SCHEDULING_TRAVEL_PROVIDER', $client, 'scheduling', false],
-            ['GOOGLE_ROUTES_API_KEY', $client, 'scheduling', true],
             ['DB_DATABASE', $client, 'core', false],
             ['DB_USERNAME', $client, 'core', false],
             ['DB_PASSWORD', $client, 'core', true],
@@ -345,56 +303,8 @@ final class EnvironmentVariableCatalog
             ['DO_SPACES_BUCKET', $client, 'storage', false],
             ['CDN_BASE_URL', $client, 'storage', false],
 
-            // Messaging/provider/sender identity.
-            ['MAIL_MAILER', $client, 'messaging', false],
-            ['MAIL_FROM_ADDRESS', $client, 'messaging', false],
-            ['MAIL_FROM_NAME', $client, 'messaging', false],
-            ['EMAIL_PROVIDER', $client, 'messaging', false],
-            ['FROM_EMAIL_TRANSACTIONAL', $client, 'messaging', false],
-            ['FROM_NAME_TRANSACTIONAL', $client, 'messaging', false],
-            ['FROM_EMAIL_MARKETING', $client, 'messaging', false],
-            ['FROM_NAME_MARKETING', $client, 'messaging', false],
-            ['RESEND_API_KEY', $client, 'messaging', true],
-            ['RESEND_WEBHOOK_SECRET', $client, 'messaging', true],
-            ['INBOUND_EMAIL_DOMAIN', $client, 'inbound_messaging', false],
-            ['RESEND_FROM_EMAIL_TRANSACTIONAL', $client, 'messaging', false],
-            ['RESEND_FROM_NAME_TRANSACTIONAL', $client, 'messaging', false],
-            ['RESEND_FROM_EMAIL_MARKETING', $client, 'messaging', false],
-            ['RESEND_FROM_NAME_MARKETING', $client, 'messaging', false],
-            ['PERMISSION_INVITATION_PUBLIC_URL', $client, 'messaging', false],
-            ['INTERNAL_NOTIFICATION_FROM_ADDRESS', $client, 'internal_notifications', false],
-            ['INTERNAL_NOTIFICATION_FROM_NAME', $client, 'internal_notifications', false],
-            ['INBOUND_REPLY_DEFAULT_TEAM_MEMBER_EMAIL', $client, 'inbound_messaging', false],
+            // Remaining Core-owned client metadata.
             ['PROJECT_STATE_ADMIN_EMAIL', $client, 'core', false],
-
-
-            // SMS provider selection and credentials.
-            ['SMS_ENABLED', $client, 'messaging', false],
-            ['SMS_PROVIDER', $client, 'messaging', false],
-            ['SMS_FROM', $client, 'messaging', false],
-            ['SMS_FROM_TRANSACTIONAL', $client, 'messaging', false],
-            ['SMS_FROM_MARKETING', $client, 'messaging', false],
-            ['TELNYX_API_KEY', $client, 'messaging', true],
-            ['TELNYX_FROM', $client, 'messaging', false],
-            ['TELNYX_FROM_TRANSACTIONAL', $client, 'messaging', false],
-            ['TELNYX_FROM_MARKETING', $client, 'messaging', false],
-            ['TELNYX_FROM_NOTIFICATIONS', $client, 'messaging', false],
-            ['TELNYX_WEBHOOK_PUBLIC_KEY', $client, 'messaging', false],
-            ['MESSAGING_SMS_MARKETING_PROFILE_ID', $client, 'messaging', false],
-            ['MESSAGING_SMS_TRANSACTIONAL_PROFILE_ID', $client, 'messaging', false],
-            ['TWILIO_SID', $client, 'messaging', false],
-            ['TWILIO_AUTH_TOKEN', $client, 'messaging', true],
-            ['TWILIO_FROM', $client, 'messaging', false],
-            ['TWILIO_FROM_TRANSACTIONAL', $client, 'messaging', false],
-            ['TWILIO_FROM_MARKETING', $client, 'messaging', false],
-            ['TWILIO_VIRTUAL_PHONE', $client, 'messaging', false],
-
-            // Webinar provider selection and credentials.
-            ['WEBINAR_PROVIDER', $client, 'webinars', false],
-            ['ZOOM_ACCOUNT_ID', $client, 'webinars', false],
-            ['ZOOM_CLIENT_ID', $client, 'webinars', false],
-            ['ZOOM_CLIENT_SECRET', $client, 'webinars', true],
-            ['ZOOM_WEBHOOK_SECRET', $client, 'webinars', true],
         ];
     }
 }

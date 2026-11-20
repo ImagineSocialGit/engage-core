@@ -24,6 +24,22 @@ final class ModuleEnvironmentDefinitionLoaderTest extends TestCase
         }
     }
 
+    public function test_nonplatform_environment_owners_are_declared_by_their_modules(): void
+    {
+        $moduleOwned = ModuleEnvironmentDefinitionLoader::definitions();
+
+        foreach (EnvironmentVariableCatalog::builtInDefinitions() as $key => $definition) {
+            // Core and platform storage are bootstrap infrastructure rather
+            // than separately selected module capabilities.
+            if (in_array($definition->owner, ['core', 'storage'], true)) {
+                continue;
+            }
+
+            $this->assertArrayHasKey($key, $moduleOwned);
+            $this->assertEquals($definition, $moduleOwned[$key]);
+        }
+    }
+
     public function test_new_module_declaration_is_discovered_without_a_central_catalog_edit(): void
     {
         $directory = $this->temporaryModuleDirectory([
