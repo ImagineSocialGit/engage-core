@@ -66,6 +66,16 @@ return [
             'replace_placeholders' => true,
         ],
 
+        // Personal-data access audit: IDs only, no customer names, emails, or phone numbers.
+        // Configure log collection and retention per deployed merchant policy.
+        'personal_data_access' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/personal-data-access.log'),
+            'level' => 'info',
+            'days' => 90,
+            'replace_placeholders' => true,
+        ],
+
         'daily' => [
             'driver' => 'daily',
             'path' => storage_path('logs/laravel.log'),

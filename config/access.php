@@ -4,6 +4,10 @@ return [
     'default_role' => 'member',
     'legacy_role' => 'owner',
 
+    // Set true per client only after confirming that every CRM user has an
+    // explicit access profile. Default preserves older client installations.
+    'require_profiles' => false,
+
     'roles' => [
         'owner' => [
             'label' => 'Owner',

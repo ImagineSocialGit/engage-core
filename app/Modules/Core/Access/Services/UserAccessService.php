@@ -20,15 +20,27 @@ final class UserAccessService
 
     public function isActive(User $user): bool
     {
-        return $this->profile($user)?->is_active ?? true;
+        $profile = $this->profile($user);
+
+        if ($profile instanceof UserAccessProfile) {
+            return $profile->is_active === true
+                && array_key_exists((string) $profile->role_key, $this->roleDefinitions());
+        }
+
+        return ! (bool) config('access.require_profiles', false);
     }
 
     public function roleKey(User $user): string
     {
-        $role = trim((string) ($this->profile($user)?->role_key ?? ''));
+        $profile = $this->profile($user);
+        $role = trim((string) ($profile?->role_key ?? ''));
 
-        if ($role !== '' && array_key_exists($role, $this->roleDefinitions())) {
-            return $role;
+        if ($profile instanceof UserAccessProfile
+            || (bool) config('access.require_profiles', false)
+        ) {
+            return $role !== '' && array_key_exists($role, $this->roleDefinitions())
+                ? $role
+                : (string) config('access.default_role', 'member');
         }
 
         $legacy = trim((string) config('access.legacy_role', 'owner'));

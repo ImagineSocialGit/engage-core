@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\CRM\DashboardController;
+use App\Http\Middleware\AuditProtectedDataRead;
 use App\Http\Controllers\CRM\ProjectStateController;
 use App\Http\Controllers\CRM\ProcessHighwayController;
 use App\Modules\Core\Access\Controllers\ContactAssignmentController;
@@ -80,6 +81,7 @@ Route::prefix(config('contacts.routes.plural'))
     ->name('crm.contacts.')
     ->group(function () {
         Route::get('/', [ContactController::class, 'index'])
+            ->middleware(AuditProtectedDataRead::class.':contact,list')
             ->name('index');
 
         Route::post('/', [ContactController::class, 'store'])
@@ -87,6 +89,7 @@ Route::prefix(config('contacts.routes.plural'))
             ->name('store');
 
         Route::get('/lookup', ContactLookupController::class)
+            ->middleware(AuditProtectedDataRead::class.':contact,lookup')
             ->name('lookup');
 
         Route::get('/import', [ContactController::class, 'import'])
@@ -118,7 +121,7 @@ Route::prefix(config('contacts.routes.plural'))
             ->name('results.tag');
 
         Route::post('/results/export', [ContactResultActionController::class, 'export'])
-            ->middleware('capability:contacts.export')
+            ->middleware(['capability:contacts.export', AuditProtectedDataRead::class.':contact,export'])
             ->name('results.export');
 
         Route::post('/results/assignment', [ContactResultActionController::class, 'assignment'])
@@ -126,6 +129,7 @@ Route::prefix(config('contacts.routes.plural'))
             ->name('results.assignment');
 
         Route::get('/{contact}', [ContactController::class, 'show'])
+            ->middleware(AuditProtectedDataRead::class.':contact,view')
             ->name('show');
 
         Route::patch('/{contact}', [ContactController::class, 'update'])

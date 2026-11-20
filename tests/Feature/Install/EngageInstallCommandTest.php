@@ -321,8 +321,8 @@ class EngageInstallCommandTest extends TestCase
         ])
             ->expectsQuestion('Name', 'Install Admin')
             ->expectsQuestion('Email', 'INSTALL.ADMIN@example.com')
-            ->expectsQuestion('Password', 'install-test-password')
-            ->expectsQuestion('Confirm password', 'install-test-password')
+            ->expectsQuestion('Password', 'Install-Test-Password-42!')
+            ->expectsQuestion('Confirm password', 'Install-Test-Password-42!')
             ->assertExitCode(0);
 
         $user = User::query()
@@ -331,7 +331,7 @@ class EngageInstallCommandTest extends TestCase
 
         $this->assertSame('Install Admin', $user->name);
         $this->assertTrue(Hash::check(
-            'install-test-password',
+            'Install-Test-Password-42!',
             $user->password,
         ));
         $this->assertFalse(Schema::hasTable('team_members'));

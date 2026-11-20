@@ -42,6 +42,41 @@ class TeamAccessFoundationTest extends TestCase
         ]);
     }
 
+    public function test_profileless_access_can_be_denied_after_a_client_completes_profile_migration(): void
+    {
+        config()->set('access.require_profiles', true);
+
+        $unprofiled = User::factory()->create();
+        $access = app(UserAccessService::class);
+
+        $this->assertFalse($access->isActive($unprofiled));
+        $this->assertFalse($access->allows($unprofiled, 'team.manage'));
+        $this->assertSame('member', $access->roleKey($unprofiled));
+
+        $this->profile($unprofiled, 'owner');
+        $access->forget($unprofiled);
+
+        $this->assertTrue($access->isActive($unprofiled));
+        $this->assertTrue($access->allows($unprofiled, 'team.manage'));
+    }
+
+    public function test_invalid_access_role_never_inherits_legacy_owner_grants(): void
+    {
+        $user = User::factory()->create();
+        UserAccessProfile::query()->create([
+            'user_id' => $user->getKey(),
+            'role_key' => 'unrecognized_role',
+            'is_active' => true,
+            'capability_overrides' => ['team.manage' => true],
+        ]);
+
+        $access = app(UserAccessService::class);
+
+        $this->assertSame('member', $access->roleKey($user));
+        $this->assertFalse($access->isActive($user));
+        $this->assertFalse($access->allows($user, 'team.manage'));
+    }
+
     public function test_contact_visibility_follows_owner_manager_member_viewer_and_team_rules(): void
     {
         $owner = User::factory()->create();

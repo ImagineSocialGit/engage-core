@@ -71,6 +71,14 @@ final class CommerceOrderCustomerReconciler
             );
         }
 
+        // A provider replay must never repopulate customer PII after redaction.
+        if (is_string(data_get($customer->meta, 'privacy.redacted_at'))) {
+            return new CommerceOrderCustomerResolution(
+                commerceCustomerId: (int) $customer->getKey(),
+                contactId: null,
+            );
+        }
+
         if ($customer->trashed()) {
             $customer->restore();
         }

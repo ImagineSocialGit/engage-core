@@ -12,7 +12,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules\Password;
+use App\Support\Users\CrmPasswordPolicy;
 use Illuminate\View\View;
 
 final class TeamAccessController extends Controller
@@ -62,7 +62,7 @@ final class TeamAccessController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')],
-            'password' => ['required', 'string', Password::defaults()],
+            'password' => ['required', 'string', CrmPasswordPolicy::rule()],
             'role_key' => ['required', 'string', Rule::in(array_keys(config('access.roles', [])))],
             'team_ids' => ['nullable', 'array'],
             'team_ids.*' => [

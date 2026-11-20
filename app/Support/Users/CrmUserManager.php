@@ -7,7 +7,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 
 final class CrmUserManager
@@ -43,7 +42,7 @@ final class CrmUserManager
             'password' => [
                 'required',
                 'string',
-                Password::defaults(),
+                CrmPasswordPolicy::rule(),
             ],
             'role_key' => [
                 'required',
@@ -95,7 +94,7 @@ final class CrmUserManager
             'password' => [
                 'required',
                 'string',
-                Password::defaults(),
+                CrmPasswordPolicy::rule(),
             ],
         ])->validate();
 

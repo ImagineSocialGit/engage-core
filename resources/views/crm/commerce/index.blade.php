@@ -7,6 +7,11 @@
     <div class="space-y-6" data-commerce-workspace>
         <div class="flex flex-wrap items-center justify-between gap-3">
             <p class="text-sm text-slate-600">Normalized Commerce state. Provider-specific store administration stays with the provider.</p>
+            @if($canReviewPrivacy)
+                <a href="{{ route('crm.commerce.privacy.index') }}" class="inline-flex items-center rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                    Privacy requests
+                </a>
+            @endif
             <a
                 href="{{ route('crm.commerce.orders.index') }}"
                 class="inline-flex items-center rounded-xl px-4 py-2 text-sm font-semibold ring-1 transition {{ module_tone('commerce', 'badge') }} hover:brightness-95"

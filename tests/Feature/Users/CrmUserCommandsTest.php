@@ -17,8 +17,8 @@ class CrmUserCommandsTest extends TestCase
         $this->artisan('engage:user:add')
             ->expectsQuestion('Name', 'First Admin')
             ->expectsQuestion('Email', 'FIRST.ADMIN@example.com')
-            ->expectsQuestion('Password', 'strong-test-password')
-            ->expectsQuestion('Confirm password', 'strong-test-password')
+            ->expectsQuestion('Password', 'Strong-Test-Password-42!')
+            ->expectsQuestion('Confirm password', 'Strong-Test-Password-42!')
             ->assertExitCode(0);
 
         $user = User::query()
@@ -27,7 +27,7 @@ class CrmUserCommandsTest extends TestCase
 
         $this->assertSame('First Admin', $user->name);
         $this->assertTrue(Hash::check(
-            'strong-test-password',
+            'Strong-Test-Password-42!',
             $user->password,
         ));
         $this->assertTrue(Schema::hasTable('team_members'));
@@ -46,8 +46,8 @@ class CrmUserCommandsTest extends TestCase
         $this->artisan('engage:user:add')
             ->expectsQuestion('Name', 'Replacement Admin')
             ->expectsQuestion('Email', 'existing@example.com')
-            ->expectsQuestion('Password', 'replacement-password')
-            ->expectsQuestion('Confirm password', 'replacement-password')
+            ->expectsQuestion('Password', 'Replacement-Password-42!')
+            ->expectsQuestion('Confirm password', 'Replacement-Password-42!')
             ->assertExitCode(1);
 
         $user->refresh();
@@ -76,15 +76,15 @@ class CrmUserCommandsTest extends TestCase
         $this->artisan('engage:user:password', [
             'email' => 'owner@example.com',
         ])
-            ->expectsQuestion('New password', 'new-owner-password')
-            ->expectsQuestion('Confirm new password', 'new-owner-password')
+            ->expectsQuestion('New password', 'New-Owner-Password-42!')
+            ->expectsQuestion('Confirm new password', 'New-Owner-Password-42!')
             ->assertExitCode(0);
 
         $user->refresh();
         $otherUser->refresh();
 
         $this->assertTrue(Hash::check(
-            'new-owner-password',
+            'New-Owner-Password-42!',
             $user->password,
         ));
         $this->assertSame(
@@ -98,8 +98,8 @@ class CrmUserCommandsTest extends TestCase
         $this->artisan('engage:user:password', [
             'email' => 'missing@example.com',
         ])
-            ->expectsQuestion('New password', 'new-owner-password')
-            ->expectsQuestion('Confirm new password', 'new-owner-password')
+            ->expectsQuestion('New password', 'New-Owner-Password-42!')
+            ->expectsQuestion('Confirm new password', 'New-Owner-Password-42!')
             ->assertExitCode(1);
 
         $this->assertDatabaseCount('users', 0);
