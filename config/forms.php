@@ -55,30 +55,6 @@ if (in_array($scheme, ['http', 'https'], true)
     $normalizedPublicUrl = $scheme.'://'.$host.($port !== null ? ':'.$port : '');
 }
 
-$clientId = trim((string) env('FORMS_EXTERNAL_INTAKE_CLIENT_ID', ''));
-$allowedForms = array_values(array_filter(array_map(
-    'trim',
-    explode(',', (string) env('FORMS_EXTERNAL_INTAKE_ALLOWED_FORMS', '')),
-)));
-$configuredDomains = env('FORMS_EXTERNAL_INTAKE_DOMAINS');
-$domainList = is_string($configuredDomains) && trim($configuredDomains) !== ''
-    ? $configuredDomains
-    : (string) env('ROOT_DOMAIN', '');
-$domains = array_values(array_filter(array_map(
-    'trim',
-    explode(',', $domainList),
-)));
-
-$clients = $clientId === '' ? [] : [
-    $clientId => [
-        'secret' => env('FORMS_EXTERNAL_INTAKE_CLIENT_SECRET'),
-        'source' => env('FORMS_EXTERNAL_INTAKE_SOURCE', $clientId),
-        'provider' => env('FORMS_EXTERNAL_INTAKE_PROVIDER', $clientId),
-        'allowed_forms' => $allowedForms,
-        'domains' => $domains,
-    ],
-];
-
 return [
     'public' => [
         'url_configured' => $publicUrlConfigured,
@@ -95,6 +71,9 @@ return [
         'nonce_ttl_seconds' => (int) env('FORMS_EXTERNAL_INTAKE_NONCE_TTL_SECONDS', 600),
         'unauthenticated_rate_limit_per_minute' => (int) env('FORMS_EXTERNAL_INTAKE_UNAUTHENTICATED_RATE_LIMIT_PER_MINUTE', 120),
         'client_rate_limit_per_minute' => (int) env('FORMS_EXTERNAL_INTAKE_CLIENT_RATE_LIMIT_PER_MINUTE', 60),
-        'clients' => $clients,
+        // Explicit per-caller authorization lives in selected client configuration.
+        // Deployment metadata alone never grants access to Forms.
+        'authorized_callers' => [],
+        'clients' => [],
     ],
 ];

@@ -14,7 +14,7 @@ class EnvironmentVariableCatalogTest extends TestCase
             'APP_URL',
             'DB_DATABASE',
             'RESEND_API_KEY',
-            'FORMS_EXTERNAL_INTAKE_CLIENT_SECRET',
+            'FORMS_EXTERNAL_INTAKE_ENABLED',
             'TELNYX_API_KEY',
             'ZOOM_CLIENT_SECRET',
         ] as $key) {

@@ -16,15 +16,13 @@ final class CoreCredentialRecipientInspector
             'module' => 'forms',
             'owner' => 'forms',
             'source_platforms' => ['seo', 'artist'],
-            'identity_key' => 'FORMS_EXTERNAL_INTAKE_CLIENT_ID',
-            'secret_key' => 'FORMS_EXTERNAL_INTAKE_CLIENT_SECRET',
+            'keys' => ['FORMS_EXTERNAL_INTAKE_ENABLED' => false],
         ],
         'donations.external_checkout' => [
             'module' => 'donations',
             'owner' => 'donations',
             'source_platforms' => ['seo'],
-            'identity_key' => 'DONATIONS_EXTERNAL_CHECKOUT_CLIENT_ID',
-            'secret_key' => 'DONATIONS_EXTERNAL_CHECKOUT_SIGNING_SECRET',
+            'keys' => ['DONATIONS_EXTERNAL_CHECKOUT_CLIENT_ID' => false, 'DONATIONS_EXTERNAL_CHECKOUT_SIGNING_SECRET' => true],
         ],
     ];
 
@@ -126,53 +124,50 @@ final class CoreCredentialRecipientInspector
                         if (! is_array($slot)) {
                             $findings[] = 'caller_slot_invalid';
                         } else {
-                            if ($purpose === 'donations.external_checkout') {
-                                // The Donations package consumer accepts only
-                                // the B14 caller-derived selected-client key.
-                                // Inline secrets or the legacy single-caller
-                                // shorthand do not establish runtime readiness.
-                                $expectedKey = CoreCredentialCallerKey::forCaller(
-                                    $purpose, $sourcePlatform, $callerId,
-                                );
-                                $declaredKey = $slot['secret_env_key'] ?? null;
-
-                                if (array_key_exists('secret', $slot) && $slot['secret'] !== null) {
-                                    $findings[] = 'unsupported_inline_signing_secret';
-                                }
-                                if ($expectedKey === null || ! is_string($declaredKey)
-                                    || $declaredKey !== $expectedKey
-                                ) {
-                                    $findings[] = 'caller_secret_binding_invalid';
-                                } else {
-                                    if (array_key_exists($expectedKey, $persistedRootEnvironment)) {
-                                        $findings[] = 'caller_secret_wrong_scope';
-                                    }
-                                    if (array_key_exists($expectedKey, $persistedClientEnvironment)) {
-                                        $value = $persistedClientEnvironment[$expectedKey];
-                                        if (! is_string($value)
-                                            || preg_match('/\A[A-Za-z0-9_-]{64}\z/D', $value) !== 1
-                                        ) {
-                                            $findings[] = 'caller_secret_invalid';
-                                        } else {
-                                            $secretPresent = true;
-                                        }
-                                    }
-                                }
-
-                                $configuredOrigin = $slot['site_origin'] ?? null;
-                                $originMatch = $this->validOrigin($configuredOrigin, $expectedEnvironment)
-                                    && $configuredOrigin === $sourceOrigin;
-
-                                if (! $originMatch) {
-                                    $findings[] = 'caller_origin_mismatch';
-                                }
+                            // The enabled capability owns the caller slot. No inline
+                            // key, implicit access, or legacy single-caller credential
+                            // can establish readiness for either module.
+                            $expectedKey = CoreCredentialCallerKey::forCaller(
+                                $purpose, $sourcePlatform, $callerId,
+                            );
+                            $declaredKey = $slot['secret_env_key'] ?? null;
+                            if (array_key_exists('secret', $slot)
+                                && ($purpose === 'forms.external_intake' || $slot['secret'] !== null)
+                            ) {
+                                $findings[] = 'unsupported_inline_signing_secret';
+                            }
+                            if ($expectedKey === null || ! is_string($declaredKey)
+                                || $declaredKey !== $expectedKey
+                            ) {
+                                $findings[] = 'caller_secret_binding_invalid';
                             } else {
-                                $secret = $slot['secret'] ?? null;
-                                $secretPresent = is_string($secret) && strlen($secret) >= 32
-                                    && strlen($secret) <= 4096;
-                                if (! $this->validFormsCallerMetadata($slot)) {
-                                    $findings[] = 'caller_metadata_invalid';
+                                if (array_key_exists($expectedKey, $persistedRootEnvironment)) {
+                                    $findings[] = 'caller_secret_wrong_scope';
                                 }
+                                if (array_key_exists($expectedKey, $persistedClientEnvironment)) {
+                                    $value = $persistedClientEnvironment[$expectedKey];
+                                    if (! is_string($value)
+                                        || preg_match('/\A[A-Za-z0-9_-]{64}\z/D', $value) !== 1
+                                    ) {
+                                        $findings[] = 'caller_secret_invalid';
+                                    } else {
+                                        $secretPresent = true;
+                                    }
+                                }
+                            }
+                            $configuredOrigin = $purpose === 'forms.external_intake'
+                                ? ($slot['source_origin'] ?? null)
+                                : ($slot['site_origin'] ?? null);
+                            $originMatch = $this->validOrigin($configuredOrigin, $expectedEnvironment)
+                                && $configuredOrigin === $sourceOrigin;
+                            if (! $originMatch) {
+                                $findings[] = 'caller_origin_mismatch';
+                            }
+                            if ($purpose === 'forms.external_intake'
+                                && (($slot['source_platform'] ?? null) !== $sourcePlatform
+                                    || ! $this->validFormsCallerMetadata($slot))
+                            ) {
+                                $findings[] = 'caller_metadata_invalid';
                             }
                         }
                     }
@@ -224,7 +219,7 @@ final class CoreCredentialRecipientInspector
             return false;
         }
 
-        foreach ([$route['identity_key'] => false, $route['secret_key'] => true] as $key => $secret) {
+        foreach ($route['keys'] as $key => $secret) {
             $matches = array_values(array_filter(
                 $requirements,
                 static fn (mixed $value): bool => is_array($value) && ($value['key'] ?? null) === $key,
@@ -265,7 +260,20 @@ final class CoreCredentialRecipientInspector
             }
         }
 
-        return count(array_unique($forms)) === count($forms);
+        if (count(array_unique($forms)) !== count($forms)) {
+            return false;
+        }
+        $domains = $slot['domains'] ?? null;
+        if (! is_array($domains) || ! array_is_list($domains) || $domains === []) {
+            return false;
+        }
+        foreach ($domains as $domain) {
+            if (! is_string($domain) || $domain === '' || str_contains($domain, '://')) {
+                return false;
+            }
+        }
+
+        return count(array_unique($domains)) === count($domains);
     }
 
     private function validOrigin(mixed $value, string $environment): bool

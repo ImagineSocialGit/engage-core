@@ -99,31 +99,22 @@ class FormsDeploymentPlanContributorTest extends TestCase
         }
     }
 
-    public function test_enabled_external_intake_requires_runtime_identity_and_signing_values(): void
+    public function test_enabled_external_intake_requires_each_approved_caller_secret(): void
     {
         $this->configureFormsPreset(public: true);
         config()->set('forms.external_intake.enabled', true);
-
+        $key = \App\Support\Deployment\Credentials\CoreCredentialCallerKey::forCaller(
+            'forms.external_intake', 'artist', 'artist_one',
+        );
+        config()->set('forms.external_intake.clients', [
+            'artist_one' => ['source_platform' => 'artist', 'secret_env_key' => $key],
+        ]);
+        $contributor = app(FormsDeploymentPlanContributor::class);
         $requirements = $this->requirements();
-
-        foreach ([
-            'FORMS_EXTERNAL_INTAKE_CLIENT_ID',
-            'FORMS_EXTERNAL_INTAKE_CLIENT_SECRET',
-            'FORMS_EXTERNAL_INTAKE_SOURCE',
-            'FORMS_EXTERNAL_INTAKE_PROVIDER',
-            'FORMS_EXTERNAL_INTAKE_ALLOWED_FORMS',
-        ] as $key) {
-            $this->assertSame(EnvironmentRequirement::REQUIRED, $requirements[$key]->requirement);
-        }
-
-        $this->assertSame(
-            EnvironmentRequirement::OPTIONAL,
-            $requirements['FORMS_EXTERNAL_INTAKE_DOMAINS']->requirement,
-        );
-        $this->assertSame(
-            EnvironmentRequirement::DEFAULTED,
-            $requirements['FORMS_EXTERNAL_INTAKE_MAX_BODY_BYTES']->requirement,
-        );
+        $this->assertSame(EnvironmentRequirement::REQUIRED, $requirements[$key]->requirement);
+        $this->assertSame('forms', iterator_to_array($contributor->environmentDefinitions())[0]->owner);
+        $this->assertSame(EnvironmentRequirement::DEFAULTED, $requirements['FORMS_EXTERNAL_INTAKE_MAX_BODY_BYTES']->requirement);
+        $this->assertArrayNotHasKey('FORMS_EXTERNAL_INTAKE_CLIENT_SECRET', $requirements);
     }
 
     private function configureFormsPreset(

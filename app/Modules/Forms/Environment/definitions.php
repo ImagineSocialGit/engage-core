@@ -16,10 +16,4 @@ return [
     ['key' => 'FORMS_EXTERNAL_INTAKE_CLIENT_RATE_LIMIT_PER_MINUTE', 'scope' => 'root', 'secret' => false],
     ['key' => 'FORMS_APP_URL', 'scope' => 'client', 'secret' => false],
     ['key' => 'FORMS_EXTERNAL_INTAKE_ENABLED', 'scope' => 'client', 'secret' => false],
-    ['key' => 'FORMS_EXTERNAL_INTAKE_CLIENT_ID', 'scope' => 'client', 'secret' => false],
-    ['key' => 'FORMS_EXTERNAL_INTAKE_CLIENT_SECRET', 'scope' => 'client', 'secret' => true],
-    ['key' => 'FORMS_EXTERNAL_INTAKE_SOURCE', 'scope' => 'client', 'secret' => false],
-    ['key' => 'FORMS_EXTERNAL_INTAKE_PROVIDER', 'scope' => 'client', 'secret' => false],
-    ['key' => 'FORMS_EXTERNAL_INTAKE_ALLOWED_FORMS', 'scope' => 'client', 'secret' => false],
-    ['key' => 'FORMS_EXTERNAL_INTAKE_DOMAINS', 'scope' => 'client', 'secret' => false],
 ];

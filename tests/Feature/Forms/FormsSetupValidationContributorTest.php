@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Forms;
 
+use App\Support\Deployment\Credentials\CoreCredentialCallerKey;
 use App\Modules\Forms\Models\FormDefinition;
 use App\Modules\Forms\Models\FormVersion;
 use App\Modules\Forms\Providers\FormsModuleServiceProvider;
@@ -13,6 +14,16 @@ use Tests\TestCase;
 class FormsSetupValidationContributorTest extends TestCase
 {
     use RefreshDatabase;
+
+    private ?string $externalCredentialFile = null;
+
+    protected function tearDown(): void
+    {
+        if ($this->externalCredentialFile !== null && is_file($this->externalCredentialFile)) {
+            unlink($this->externalCredentialFile);
+        }
+        parent::tearDown();
+    }
 
     public function test_valid_active_published_form_has_no_forms_runtime_findings(): void
     {
@@ -172,6 +183,11 @@ class FormsSetupValidationContributorTest extends TestCase
     public function test_external_intake_allowed_form_must_be_current_published_and_public(): void
     {
         $this->publishedDefinition('artist_updates');
+        $key = CoreCredentialCallerKey::forCaller('forms.external_intake', 'artist', 'engage_sites');
+        $this->externalCredentialFile = tempnam(sys_get_temp_dir(), 'engage-forms-validation-');
+        self::assertNotFalse($this->externalCredentialFile);
+        file_put_contents($this->externalCredentialFile, $key.'='.str_repeat('K', 64)."\n");
+        config()->set('client.env_path', $this->externalCredentialFile);
         config()->set('forms.external_intake', [
             'enabled' => true,
             'max_body_bytes' => 262144,
@@ -181,7 +197,10 @@ class FormsSetupValidationContributorTest extends TestCase
             'client_rate_limit_per_minute' => 60,
             'clients' => [
                 'engage_sites' => [
-                    'secret' => 'test-external-forms-secret-with-more-than-32-bytes',
+                    'source_platform' => 'artist',
+                    'source_origin' => 'https://artist.example',
+                    'secret_env_key' => $key,
+                    'domains' => ['artist.example'],
                     'source' => 'engage_sites',
                     'provider' => 'engage_sites',
                     'allowed_forms' => ['artist_updates', 'missing_form'],

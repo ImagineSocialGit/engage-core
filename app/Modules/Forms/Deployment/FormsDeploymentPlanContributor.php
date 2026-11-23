@@ -2,15 +2,17 @@
 
 namespace App\Modules\Forms\Deployment;
 
-use App\Support\Deployment\Contracts\DeploymentPlanContributor;
+use App\Support\Deployment\Contracts\DeploymentEnvironmentDefinitionContributor;
+use App\Support\Deployment\Credentials\CoreCredentialCallerKey;
 use App\Support\Deployment\Contracts\DeploymentSetupContributor;
 use App\Support\Deployment\Data\DeploymentSetupStep;
 use App\Support\Deployment\Data\EnvironmentRequirement;
+use App\Support\Environment\Data\EnvironmentVariableDefinition;
 use App\Support\Presets\Enums\PresetDomain;
 use App\Support\Presets\PresetCompositionResolver;
 use App\Support\Presets\PresetPackageResolver;
 
-final class FormsDeploymentPlanContributor implements DeploymentPlanContributor, DeploymentSetupContributor
+final class FormsDeploymentPlanContributor implements DeploymentEnvironmentDefinitionContributor, DeploymentSetupContributor
 {
     public function __construct(
         private readonly PresetPackageResolver $packages,
@@ -20,6 +22,17 @@ final class FormsDeploymentPlanContributor implements DeploymentPlanContributor,
     public function owner(): string
     {
         return 'forms';
+    }
+
+    public function environmentDefinitions(): iterable
+    {
+        foreach ($this->activeCallerSecretKeys() as $key) {
+            yield new EnvironmentVariableDefinition(
+                key: $key,
+                scope: EnvironmentVariableDefinition::SCOPE_CLIENT,
+                owner: 'forms', secret: true,
+            );
+        }
     }
 
     public function environmentRequirements(): iterable
@@ -81,20 +94,12 @@ final class FormsDeploymentPlanContributor implements DeploymentPlanContributor,
             return;
         }
 
-        foreach ([
-            'FORMS_EXTERNAL_INTAKE_CLIENT_ID' => 'External Forms intake requires a stable caller identity.',
-            'FORMS_EXTERNAL_INTAKE_CLIENT_SECRET' => 'External Forms intake requires a shared signing secret.',
-            'FORMS_EXTERNAL_INTAKE_SOURCE' => 'External Forms intake records the configured source identity.',
-            'FORMS_EXTERNAL_INTAKE_PROVIDER' => 'External Forms intake records the configured provider identity.',
-            'FORMS_EXTERNAL_INTAKE_ALLOWED_FORMS' => 'External Forms intake must explicitly allow the published form keys callable by this client.',
-        ] as $key => $reason) {
-            yield EnvironmentRequirement::required($key, $reason);
+        foreach ($this->activeCallerSecretKeys() as $key) {
+            yield EnvironmentRequirement::required(
+                $key,
+                'An approved external Forms caller requires its own selected-client signing credential.',
+            );
         }
-
-        yield EnvironmentRequirement::optional(
-            'FORMS_EXTERNAL_INTAKE_DOMAINS',
-            'Optional bare-domain overrides are only needed when Forms should advertise domains beyond ROOT_DOMAIN.',
-        );
     }
 
     public function setupSteps(): iterable
@@ -114,18 +119,14 @@ final class FormsDeploymentPlanContributor implements DeploymentPlanContributor,
             reason: 'This client allows an approved first-party site application to read and submit Core-backed Forms through the signed server-to-server boundary.',
             instructions: [
                 'Confirm the approved caller identity, source/provider labels, and exact allowed public Form keys for this environment.',
-                'If the shared signing credential has not been issued yet, run php artisan forms:external-intake:issue-secret [client] and install the matching Core/caller credential blocks in their matching environments.',
+                'Register each approved caller through the protected Infrastructure lifecycle, then issue and deliver the selected per-caller credential.',
                 "Give the caller the signed endpoints on https://webhooks.{$rootDomain}/forms/{form_key} and https://webhooks.{$rootDomain}/forms/{form_key}/submissions.",
                 'Do not reuse a staging signing credential in production unless that sharing is deliberate and documented.',
             ],
-            environmentKeys: [
-                'FORMS_EXTERNAL_INTAKE_CLIENT_ID',
-                'FORMS_EXTERNAL_INTAKE_CLIENT_SECRET',
-                'FORMS_EXTERNAL_INTAKE_SOURCE',
-                'FORMS_EXTERNAL_INTAKE_PROVIDER',
-                'FORMS_EXTERNAL_INTAKE_ALLOWED_FORMS',
-                'FORMS_EXTERNAL_INTAKE_DOMAINS',
-            ],
+            environmentKeys: array_merge(
+                ['FORMS_EXTERNAL_INTAKE_ENABLED'],
+                $this->activeCallerSecretKeys(),
+            ),
             verification: [
                 'Run php artisan setup:validate after both sides have the matching credential.',
                 'Verify an unsigned GET to one configured Form endpoint reaches Core and returns 401 authentication_failed.',
@@ -135,6 +136,35 @@ final class FormsDeploymentPlanContributor implements DeploymentPlanContributor,
             ],
             priority: 70,
         );
+    }
+
+    /** @return list<string> */
+    private function activeCallerSecretKeys(): array
+    {
+        if (config('forms.external_intake.enabled') !== true) {
+            return [];
+        }
+        $clients = config('forms.external_intake.clients', []);
+        if (! is_array($clients)) {
+            return [];
+        }
+        $keys = [];
+        foreach ($clients as $callerId => $settings) {
+            if (! is_string($callerId) || ! is_array($settings)
+                || ! is_string($settings['source_platform'] ?? null)
+            ) {
+                continue;
+            }
+            $key = CoreCredentialCallerKey::forCaller(
+                'forms.external_intake', $settings['source_platform'], $callerId,
+            );
+            if ($key !== null) {
+                $keys[] = $key;
+            }
+        }
+        sort($keys, SORT_STRING);
+
+        return array_values(array_unique($keys));
     }
 
     private function rootDomain(): string

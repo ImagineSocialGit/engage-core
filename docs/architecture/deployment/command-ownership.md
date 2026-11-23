@@ -203,18 +203,16 @@ Only commands not already owned by `engage:install` or `presets:sync` belong her
 Condition:
 
 ```text
-Forms enabled
-server-to-server external intake configured
-valid environment-specific client ID/signing-secret pair not yet installed
+Forms selected and external intake required
+Committed caller policy present with explicit allowed forms and domains
+Caller registration and protected credential delivery not yet completed
 ```
 
-Command:
-
-```bash
-php artisan forms:external-intake:issue-secret [client]
-```
-
-The command prints matching Core/caller environment blocks and does not mutate either environment.
+Use the approved `engage deploy client` internal-caller registration and
+credential lifecycle after its delivery phase is implemented. The former
+`forms:external-intake:issue-secret` command has been retired because it printed
+credential material and bypassed controller custody. Caller metadata alone does
+not authorize a form or prove credential equality.
 
 After installing values:
 

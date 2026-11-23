@@ -17,7 +17,7 @@ final class ModuleEnvironmentDefinitionLoaderTest extends TestCase
         $this->assertSame('forms', $definitions['FORMS_APP_URL']->owner);
         $this->assertSame(EnvironmentVariableDefinition::SCOPE_CLIENT, $definitions['FORMS_APP_URL']->scope);
         $this->assertSame(EnvironmentVariableDefinition::SCOPE_ROOT, $definitions['FORMS_EXTERNAL_INTAKE_MAX_BODY_BYTES']->scope);
-        $this->assertTrue($definitions['FORMS_EXTERNAL_INTAKE_CLIENT_SECRET']->secret);
+        $this->assertFalse($definitions['FORMS_EXTERNAL_INTAKE_ENABLED']->secret);
 
         foreach ($definitions as $key => $definition) {
             $this->assertEquals($definition, EnvironmentVariableCatalog::builtInDefinitions()[$key]);

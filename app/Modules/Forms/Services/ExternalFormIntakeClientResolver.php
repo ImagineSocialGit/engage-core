@@ -10,7 +10,7 @@ final class ExternalFormIntakeClientResolver
     private const ID_PATTERN = '/^[a-z][a-z0-9_.-]*$/';
 
     public function __construct(
-        private readonly ExternalFormIntakeSecretPolicy $secrets,
+        private readonly ExternalFormIntakeSigningCredentialResolver $credentials,
         private readonly ExternalFormIntakeDomainPolicy $domains,
     ) {}
 
@@ -85,7 +85,7 @@ final class ExternalFormIntakeClientResolver
 
         $unknown = array_diff(
             array_keys($settings),
-            ['secret', 'source', 'provider', 'allowed_forms', 'domains'],
+            ['source_platform', 'source_origin', 'secret_env_key', 'source', 'provider', 'allowed_forms', 'domains'],
         );
 
         if ($unknown !== []) {
@@ -96,10 +96,13 @@ final class ExternalFormIntakeClientResolver
             ));
         }
 
-        $secret = $this->secrets->validatedSecret(
-            $settings['secret'] ?? null,
-            $clientId,
-        );
+        if (! $this->credentials->hasValidBinding($clientId, $settings)) {
+            throw new InvalidArgumentException('External Forms intake caller binding is invalid.');
+        }
+        $secret = $this->credentials->resolve($clientId, $settings);
+        if ($secret === null) {
+            throw new InvalidArgumentException('External Forms intake credential is not installed.');
+        }
         $source = $this->identity(
             $settings['source'] ?? null,
             "External Forms intake client [{$clientId}] source",

@@ -4,6 +4,7 @@ namespace Tests\Feature\Forms;
 
 use App\Modules\Core\Models\Contact;
 use App\Modules\Core\Models\ContactTag;
+use App\Support\Deployment\Credentials\CoreCredentialCallerKey;
 use App\Modules\Forms\Models\FormDefinition;
 use App\Modules\Forms\Models\FormSubmission;
 use App\Modules\Forms\Models\FormVersion;
@@ -16,11 +17,19 @@ class ExternalFormIntakeTest extends TestCase
     use RefreshDatabase;
 
     private const CLIENT_ID = 'engage_sites';
-    private const SECRET = 'test-external-forms-secret-with-more-than-32-bytes';
+    private const SECRET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-';
+
+    private string $callerEnvironmentFile;
 
     protected function setUp(): void
     {
         parent::setUp();
+
+        $this->callerEnvironmentFile = tempnam(sys_get_temp_dir(), 'engage-forms-test-');
+        self::assertNotFalse($this->callerEnvironmentFile);
+        $key = CoreCredentialCallerKey::forCaller('forms.external_intake', 'artist', self::CLIENT_ID);
+        file_put_contents($this->callerEnvironmentFile, $key.'='.self::SECRET."\n");
+        config()->set('client.env_path', $this->callerEnvironmentFile);
 
         Cache::flush();
         config()->set('modules.enabled', ['forms']);
@@ -33,13 +42,24 @@ class ExternalFormIntakeTest extends TestCase
             'client_rate_limit_per_minute' => 60,
             'clients' => [
                 self::CLIENT_ID => [
-                    'secret' => self::SECRET,
+                    'source_platform' => 'artist',
+                    'source_origin' => 'https://artist.example',
+                    'secret_env_key' => $key,
+                    'domains' => ['artist.example'],
                     'source' => 'engage_sites',
                     'provider' => 'engage_sites',
                     'allowed_forms' => ['artist_updates'],
                 ],
             ],
         ]);
+    }
+
+    protected function tearDown(): void
+    {
+        if (isset($this->callerEnvironmentFile) && is_file($this->callerEnvironmentFile)) {
+            unlink($this->callerEnvironmentFile);
+        }
+        parent::tearDown();
     }
 
     public function test_signed_external_request_creates_a_pinned_submission_with_server_owned_attribution(): void

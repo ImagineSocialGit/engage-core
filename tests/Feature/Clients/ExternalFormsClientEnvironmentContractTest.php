@@ -13,12 +13,6 @@ class ExternalFormsClientEnvironmentContractTest extends TestCase
 
         foreach ([
             'FORMS_EXTERNAL_INTAKE_ENABLED',
-            'FORMS_EXTERNAL_INTAKE_CLIENT_ID',
-            'FORMS_EXTERNAL_INTAKE_CLIENT_SECRET',
-            'FORMS_EXTERNAL_INTAKE_SOURCE',
-            'FORMS_EXTERNAL_INTAKE_PROVIDER',
-            'FORMS_EXTERNAL_INTAKE_ALLOWED_FORMS',
-            'FORMS_EXTERNAL_INTAKE_DOMAINS',
         ] as $key) {
             $this->assertContains($key, $clientOwnedKeys);
         }

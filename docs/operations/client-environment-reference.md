@@ -223,26 +223,51 @@ The Engage Core admin subdomain is deployment-owned. `CRM_APP_URL` remains the c
 
 ## External Forms server-to-server access
 
-When Engage Sites or another approved first-party server is allowed to read and submit a Core-backed form, the selected client `.env` owns the calling identity and credential values:
+External Forms intake is managed through two independent approvals. The selected
+Core client's committed `config/forms.php` (or client config override) declares an
+`external_intake.authorized_callers` map keyed by the exact first-party caller ID.
+Each entry must explicitly bind `source_platform`, `source_origin`, `source`,
+`provider`, `allowed_forms` and `domains`. Authorization is not inferred from
+registration and never stored inside the shared secret.
 
-```env
-FORMS_EXTERNAL_INTAKE_ENABLED=true
-FORMS_EXTERNAL_INTAKE_CLIENT_ID=engage_sites
-FORMS_EXTERNAL_INTAKE_CLIENT_SECRET=
-FORMS_EXTERNAL_INTAKE_SOURCE=engage_sites
-FORMS_EXTERNAL_INTAKE_PROVIDER=engage_sites
-FORMS_EXTERNAL_INTAKE_ALLOWED_FORMS=artist_updates
-FORMS_EXTERNAL_INTAKE_DOMAINS=example.com,forms.example.com
+Example client config for a deliberately authorized caller:
+
+```php
+'external_intake' => [
+    'authorized_callers' => [
+        'example_artist' => [
+            'source_platform' => 'artist',
+            'source_origin' => 'https://artist.example.com',
+            'source' => 'example_artist',
+            'provider' => 'artist',
+            'allowed_forms' => ['artist_updates'],
+            'domains' => ['artist.example.com'],
+        ],
+    ],
+],
 ```
 
-These values configure the signed application-to-application boundary used by both:
+The protected client lifecycle separately registers the caller's identity and
+origin in the Core-owned `INTERNAL_PLATFORM_CALLERS` metadata key. Both the
+registration and the committed Forms policy must match before Forms creates the
+runtime caller slot. Forms derives the per-caller secret name using
+`CoreCredentialCallerKey::forCaller('forms.external_intake', PLATFORM, CALLER_ID)`.
+The selected Core client `.env` owns that exact secret key; the caller's selected
+application owns its corresponding sender credential. Values are issued and
+transferred only through protected Infrastructure operations; do not print or
+enter them into committed config. `FORMS_EXTERNAL_INTAKE_ENABLED` controls the
+feature when no managed caller is present.
+
+Authenticated server-to-server endpoints remain:
 
 ```text
 GET  https://webhooks.[ROOT_DOMAIN]/forms/{form_key}
 POST https://webhooks.[ROOT_DOMAIN]/forms/{form_key}/submissions
 ```
 
-`FORMS_EXTERNAL_INTAKE_CLIENT_SECRET` is server-only and must not be rendered into browser HTML or JavaScript. The client ID identifies the authenticated caller. `SOURCE` and `PROVIDER` are server-owned attribution/idempotency values, and `ALLOWED_FORMS` is an exact comma-separated allowlist of form keys.
+Both endpoints enforce the same per-caller key, published-form allowlist,
+nonce/replay, and rate-limit checks. No legacy `FORMS_EXTERNAL_INTAKE_CLIENT_*`
+shared-secret fields or direct credential-issuing Artisan command are supported.
 
 The root/process environment continues to own the shared signed-request and abuse controls documented in `.env.example`:
 

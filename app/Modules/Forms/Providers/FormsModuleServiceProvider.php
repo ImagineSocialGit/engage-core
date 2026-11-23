@@ -6,11 +6,14 @@ use App\Modules\Forms\Automation\FormSubmissionAutomationTriggerAuthoringContrib
 use App\Modules\Forms\Contracts\HostedFormContextResolver;
 use App\Modules\Forms\ConfigContracts\FormDefinitionConfigContract;
 use App\Modules\Forms\ConfigContracts\FormDefinitionConfigContractTargetProvider;
-use App\Modules\Forms\Console\Commands\IssueExternalFormIntakeSecretCommand;
+use App\Modules\Forms\Deployment\FormsCallerConfiguration;
+use App\Modules\Forms\Deployment\FormsCredentialRuntimeContributor;
 use App\Modules\Forms\Deployment\FormsDeploymentPlanContributor;
 use App\Modules\Forms\HumanVerification\FormsPublicHumanVerificationSurface;
 use App\Modules\Forms\Services\HostedFormContextRegistry;
 use App\Modules\Forms\Validation\FormsSetupValidationContributor;
+use App\Support\Deployment\Credentials\CoreCredentialRuntimeContributor;
+use App\Support\Deployment\Credentials\CoreInternalCallerRegistry;
 use App\Support\HumanVerification\Contracts\RequiredPublicHumanVerificationSurface;
 use Illuminate\Support\ServiceProvider;
 
@@ -18,6 +21,20 @@ class FormsModuleServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $managed = FormsCallerConfiguration::settings(
+            CoreInternalCallerRegistry::selected(),
+            config('forms.external_intake.authorized_callers', []),
+        );
+        // Only registered AND explicitly authorized callers become active.
+        config()->set('forms.external_intake.clients', $managed);
+        if ($managed !== []) {
+            config()->set('forms.external_intake.enabled', true);
+        }
+        $this->app->tag(
+            [FormsCredentialRuntimeContributor::class],
+            CoreCredentialRuntimeContributor::TAG,
+        );
+
         $this->app->singleton(
             HostedFormContextRegistry::class,
             fn ($app): HostedFormContextRegistry => new HostedFormContextRegistry(
@@ -57,12 +74,4 @@ class FormsModuleServiceProvider extends ServiceProvider
         );
     }
 
-    public function boot(): void
-    {
-        if ($this->app->runningInConsole()) {
-            $this->commands([
-                IssueExternalFormIntakeSecretCommand::class,
-            ]);
-        }
-    }
 }

@@ -175,11 +175,11 @@ final class CoreCredentialInstallationContractTest extends TestCase
         $result = $this->inspect('forms.external_intake', [
             'enabled' => true,
             'clients' => [
-                'site_one' => ['secret' => null, 'secret_env_key' => $key, 'source' => 'seo-site', 'provider' => 'site_one', 'allowed_forms' => ['contact']],
-                'site_two' => ['secret' => self::SECRET, 'source' => 'seo-site', 'provider' => 'site_two', 'allowed_forms' => ['newsletter']],
+                'site_one' => ['source_platform' => 'seo', 'source_origin' => 'https://nonprofit.example', 'secret_env_key' => $key, 'source' => 'seo-site', 'provider' => 'site_one', 'allowed_forms' => ['contact'], 'domains' => ['nonprofit.example']],
+                'site_two' => ['source_platform' => 'seo', 'source_origin' => 'https://other.example', 'secret_env_key' => (new CoreCredentialInstallationContract())->keyFor('forms.external_intake', 'seo', 'site_two'), 'source' => 'seo-site', 'provider' => 'site_two', 'allowed_forms' => ['newsletter'], 'domains' => ['other.example']],
             ],
         ]);
-        self::assertSame('pending_owner_runtime_support', $result['status']);
+        self::assertSame('pending_delivery', $result['status']);
         self::assertSame($key, $result['candidate_client_environment_key']);
     }
 
@@ -188,7 +188,7 @@ final class CoreCredentialInstallationContractTest extends TestCase
         $key = (new CoreCredentialInstallationContract())->keyFor('forms.external_intake', 'seo', 'site_one');
         $this->assertBlocked($this->inspect('forms.external_intake', [
             'enabled' => true,
-            'clients' => ['site_one' => ['secret' => null, 'secret_env_key' => $key]],
+            'clients' => ['site_one' => ['secret_env_key' => $key]],
         ]), 'caller_metadata_invalid');
     }
 
@@ -297,20 +297,23 @@ final class CoreCredentialInstallationContractTest extends TestCase
         );
     }
 
-    public function test_forms_still_awaits_its_own_runtime_consumer(): void
+    public function test_forms_owner_requirement_recognizes_only_explicit_bound_target(): void
     {
         $key = (new CoreCredentialInstallationContract())->keyFor('forms.external_intake', 'seo', 'site_one');
         $result = $this->inspect('forms.external_intake', [
             'enabled' => true,
             'clients' => ['site_one' => [
                 'secret_env_key' => $key,
+                'source_platform' => 'seo',
+                'source_origin' => 'https://nonprofit.example',
+                'domains' => ['nonprofit.example'],
                 'source' => 'seo-site',
                 'provider' => 'site_one',
                 'allowed_forms' => ['contact'],
             ]],
         ]);
-        self::assertSame('pending_owner_runtime_support', $result['status']);
-        self::assertFalse($result['installation_target_recognized']);
+        self::assertSame('pending_delivery', $result['status']);
+        self::assertTrue($result['installation_target_recognized']);
     }
 
     /** @return array<string, mixed> */
@@ -328,7 +331,7 @@ final class CoreCredentialInstallationContractTest extends TestCase
     {
         $defaultPlan = $plan === null;
         $plan ??= $this->plan($purpose === 'forms.external_intake' ? 'forms' : 'donations', $environment);
-        if ($defaultPlan && $purpose === 'donations.external_checkout') {
+        if ($defaultPlan && in_array($purpose, ['donations.external_checkout', 'forms.external_intake'], true)) {
             $key = (new CoreCredentialInstallationContract())->keyFor($purpose, 'seo', 'site_one');
             foreach ($plan['environment_requirements'] as &$requirement) {
                 if ($requirement['key'] === $key) {
@@ -356,7 +359,7 @@ final class CoreCredentialInstallationContractTest extends TestCase
     {
         $keys = $module === 'donations'
             ? ['DONATIONS_EXTERNAL_CHECKOUT_CLIENT_ID', 'DONATIONS_EXTERNAL_CHECKOUT_SIGNING_SECRET']
-            : ['FORMS_EXTERNAL_INTAKE_CLIENT_ID', 'FORMS_EXTERNAL_INTAKE_CLIENT_SECRET'];
+            : ['FORMS_EXTERNAL_INTAKE_ENABLED'];
         return [
             'client_key' => 'example-core',
             'environment' => $environment,
@@ -370,17 +373,19 @@ final class CoreCredentialInstallationContractTest extends TestCase
             'environment_integrity_findings' => [],
             'environment_requirements' => [
                 ['key' => $keys[0], 'scope' => 'client', 'owner' => $module, 'secret' => false, 'requirement' => 'optional'],
-                ['key' => $keys[1], 'scope' => 'client', 'owner' => $module, 'secret' => true, 'requirement' => 'optional'],
                 ...($module === 'donations' ? [[
-                    'key' => (new CoreCredentialInstallationContract())->keyFor('donations.external_checkout', 'seo', 'site_one'),
+                    'key' => $keys[1], 'scope' => 'client', 'owner' => $module, 'secret' => true, 'requirement' => 'optional',
+                ]] : []),
+                ...([[
+                    'key' => (new CoreCredentialInstallationContract())->keyFor($module === 'forms' ? 'forms.external_intake' : 'donations.external_checkout', 'seo', 'site_one'),
                     'scope' => 'client',
-                    'owner' => 'donations',
+                    'owner' => $module,
                     'secret' => true,
                     'requirement' => 'required',
                     'target_path' => 'client/example-core/.env',
                     'status' => 'missing',
                     'persisted' => false,
-                ]] : []),
+                ]]),
             ],
         ];
     }

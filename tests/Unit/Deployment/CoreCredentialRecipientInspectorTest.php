@@ -170,20 +170,22 @@ final class CoreCredentialRecipientInspectorTest extends TestCase
         self::assertStringNotContainsString($key, json_encode($broken, JSON_THROW_ON_ERROR));
     }
 
-    public function test_forms_recipient_keeps_source_identity_distinct_from_authorized_peer(): void
+    public function test_forms_recipient_requires_per_caller_environment_credential(): void
     {
-        $report = $this->inspect('forms.external_intake', 'artist', 'artist_one',
-            'https://artist.example', $this->plan('forms'),
-            ['enabled' => true, 'clients' => ['artist_one' => [
-                'source' => 'artist-site', 'provider' => 'artist_one',
-                'allowed_forms' => ['newsletter_signup'], 'secret' => self::SECRET,
-                'domains' => [],
-            ]]], 'staging');
-
-        self::assertSame('configured_unverified', $report['status']);
-        self::assertNull($report['source_origin_match']);
-        self::assertFalse($report['peer_verified']);
-        self::assertFalse($report['authorization_verified']);
+        $key = CoreCredentialCallerKey::forCaller('forms.external_intake', 'artist', 'artist_one');
+        $config = ['enabled' => true, 'clients' => ['artist_one' => [
+            'source_platform' => 'artist', 'source_origin' => 'https://artist.example',
+            'secret_env_key' => $key, 'source' => 'artist-site', 'provider' => 'artist_one',
+            'allowed_forms' => ['newsletter_signup'], 'domains' => ['artist.example'],
+        ]]];
+        $missing = $this->inspect('forms.external_intake', 'artist', 'artist_one',
+            'https://artist.example', $this->plan('forms'), $config, 'staging');
+        self::assertSame('needs_provisioning', $missing['status']);
+        $present = $this->inspect('forms.external_intake', 'artist', 'artist_one',
+            'https://artist.example', $this->plan('forms'), $config, 'staging', [$key => str_repeat('S', 64)]);
+        self::assertSame('configured_unverified', $present['status']);
+        self::assertTrue($present['source_origin_match']);
+        self::assertFalse($present['authorization_verified']);
     }
 
     public function test_forms_metadata_missing_blocks_even_with_valid_secret(): void
@@ -321,7 +323,7 @@ final class CoreCredentialRecipientInspectorTest extends TestCase
         $owner = $module === 'donations' ? 'donations' : 'forms';
         $keys = $module === 'donations'
             ? ['DONATIONS_EXTERNAL_CHECKOUT_CLIENT_ID', 'DONATIONS_EXTERNAL_CHECKOUT_SIGNING_SECRET']
-            : ['FORMS_EXTERNAL_INTAKE_CLIENT_ID', 'FORMS_EXTERNAL_INTAKE_CLIENT_SECRET'];
+            : ['FORMS_EXTERNAL_INTAKE_ENABLED'];
 
         return [
             'client_key' => 'example-core',
@@ -336,7 +338,9 @@ final class CoreCredentialRecipientInspectorTest extends TestCase
             'environment_integrity_findings' => [],
             'environment_requirements' => [
                 ['key' => $keys[0], 'scope' => 'client', 'owner' => $owner, 'secret' => false, 'requirement' => 'required'],
-                ['key' => $keys[1], 'scope' => 'client', 'owner' => $owner, 'secret' => true, 'requirement' => 'required'],
+                ...($module === 'donations' ? [[
+                    'key' => $keys[1], 'scope' => 'client', 'owner' => $owner, 'secret' => true, 'requirement' => 'required',
+                ]] : []),
             ],
         ];
     }
