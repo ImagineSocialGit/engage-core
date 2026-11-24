@@ -9,6 +9,7 @@ use App\Support\Clients\ClientEnvironmentLoader;
 use App\Support\Routing\CoreApplicationHost;
 use App\Support\Clients\ClientPackageManifestLoader;
 use App\Support\Clients\ClientPackageRuntime;
+use App\Support\Runtime\ExternalRootEnvironment;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -153,6 +154,8 @@ $app = Application::configure(basePath: dirname(__DIR__))
         });
     })
     ->create();
+
+ExternalRootEnvironment::configure($app);
 
 $app->afterLoadingEnvironment(function () use ($app): void {
     if (Env::get('APP_ENV') === 'testing') {
