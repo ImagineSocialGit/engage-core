@@ -3,6 +3,7 @@
 namespace App\Support\Deployment;
 
 use App\Support\Environment\Data\EnvironmentVariableDefinition;
+use App\Support\Runtime\ExternalSelectedEnvironment;
 use Dotenv\Dotenv;
 use Dotenv\Exception\InvalidFileException;
 use RuntimeException;
@@ -12,7 +13,7 @@ class EnvironmentFileRepository
     public function pathForScope(string $scope): string
     {
         return match ($scope) {
-            EnvironmentVariableDefinition::SCOPE_ROOT => base_path('.env'),
+            EnvironmentVariableDefinition::SCOPE_ROOT => ExternalSelectedEnvironment::rootPath() ?? base_path('.env'),
             EnvironmentVariableDefinition::SCOPE_CLIENT => $this->clientEnvironmentPath(),
             default => throw new RuntimeException("Unsupported environment scope [{$scope}]."),
         };
@@ -182,6 +183,11 @@ class EnvironmentFileRepository
 
     private function clientEnvironmentPath(): string
     {
+        $external = ExternalSelectedEnvironment::clientPath();
+        if ($external !== null) {
+            return $external;
+        }
+
         $path = config('client.env_path');
 
         if (! is_string($path) || trim($path) === '') {

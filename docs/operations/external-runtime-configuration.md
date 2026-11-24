@@ -28,3 +28,24 @@ Run the focused tests on the development checkout:
 ```bash
 php artisan test tests/Unit/Runtime/ExternalRootEnvironmentTest.php
 ```
+
+## Selected-client external configuration (EC-02B)
+
+For Core and SEO only, when `ENGAGE_RUNTIME_CONFIG_DIR` is explicitly set,
+the selected-client loader reads `client.env` in **the same protected generation**
+as `root.env`, independently of source-release `.env` files. A missing, symlinked,
+hardlinked, world-accessible or otherwise invalid external `client.env` is a
+fatal configuration error. It must not fall back to `client/<CLIENT_KEY>/.env`.
+The selected client's source directory and PHP package definitions still come
+from the selected release; only secrets/environment settings are external.
+
+Core's deployment environment inspection and SEO's credential runtime/setup
+inspection use the same external root/client paths. Core's application-side
+environment synchronizer refuses all writes in external mode: only an approved
+Infrastructure writer may create a new immutable generation. With external mode
+unset, the existing development and deployed paths are unchanged.
+
+**Do not enable external mode on staging or production yet.** The approved
+Infrastructure writer, isolated cache generation, independent remote proofs,
+service bindings, rotation and cutover operations are still to be completed.
+The EC-02B tests verify consumer behavior, not live deployment readiness.

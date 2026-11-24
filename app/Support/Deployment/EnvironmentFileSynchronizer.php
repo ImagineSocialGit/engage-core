@@ -4,6 +4,7 @@ namespace App\Support\Deployment;
 
 use App\Support\Deployment\Data\DeploymentPlan;
 use App\Support\Deployment\Data\ResolvedEnvironmentRequirement;
+use App\Support\Runtime\ExternalSelectedEnvironment;
 use Illuminate\Support\Env;
 use RuntimeException;
 
@@ -21,6 +22,12 @@ final class EnvironmentFileSynchronizer
      */
     public function writeMissingRequiredKeys(DeploymentPlan $plan): array
     {
+        // External generations are immutable and may only be issued by the
+        // Infrastructure provisioner, never by the interactive setup writer.
+        if (ExternalSelectedEnvironment::enabled()) {
+            throw new RuntimeException('External configuration generations cannot be modified by application setup.');
+        }
+
         $byPath = [];
 
         foreach ($plan->environmentRequirements as $resolved) {

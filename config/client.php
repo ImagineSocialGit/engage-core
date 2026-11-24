@@ -13,7 +13,7 @@ return [
     'path' => $clientPath,
     'config_path' => $testing ? null : $clientPath.'/config',
     'views_path' => $testing ? null : $clientPath.'/resources/views',
-    'env_path' => $testing ? null : $clientPath.'/.env',
+    'env_path' => $testing ? null : (\App\Support\Runtime\ExternalSelectedEnvironment::clientPath() ?? $clientPath.'/.env'),
 
     'timezone' => 'UTC',
 
